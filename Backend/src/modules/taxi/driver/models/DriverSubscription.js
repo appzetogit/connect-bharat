@@ -56,6 +56,11 @@ const driverSubscriptionSchema = new mongoose.Schema(
     // and commission not charged while it was active.
     tripsCovered: { type: Number, default: 0 },
     commissionWaived: { type: Number, default: 0 },
+
+    // Set (atomically, by whichever server instance gets there first) when the
+    // "your subscription has ended" push is sent, so the four instances never
+    // notify the same driver twice for the same pass.
+    expiryNotifiedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );

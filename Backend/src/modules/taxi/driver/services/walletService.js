@@ -10,6 +10,7 @@ import { DriverSubscription } from '../models/DriverSubscription.js';
 import { getWalletSettings } from '../../services/appSettingsService.js';
 import {
   getActiveDriverSubscription,
+  getDriverVehicleClasses,
   resolveDriverSubscriptionSettings,
 } from './driverSubscriptionService.js';
 
@@ -167,9 +168,18 @@ const getWalletSnapshot = async (driver) => {
   };
 };
 
+// Whether a paid pass is covering this driver right now, in which case the
+// wallet minimum is not asked of them. Always on: a pass is mandatory.
+const isCoveredBySubscription = async (driverId, { session } = {}) => {
+  const settings = await resolveDriverSubscriptionSettings();
+  if (!settings.waiveWalletMinimum) return false;
+  return Boolean(await getActiveDriverSubscription(driverId, { session }));
+};
+
 export const serializeDriverWallet = async (driver) => {
   const wallet = await getWalletSnapshot(driver);
   const isBelowMinimumBalance = wallet.balance < wallet.minimumBalanceForOrders;
+  const covered = await isCoveredBySubscription(driver._id);
 
   return {
     balance: wallet.balance,
@@ -180,7 +190,7 @@ export const serializeDriverWallet = async (driver) => {
     isTransferEnabled: wallet.rules.isTransferEnabled,
     minimumTopUpAmount: wallet.rules.minimumTopUpAmount,
     minimumTransferAmount: wallet.rules.minimumTransferAmount,
-    isBlocked: wallet.isBlocked || !wallet.rules.isWalletEnabled || isBelowMinimumBalance,
+    isBlocked: !wallet.rules.isWalletEnabled || ((wallet.isBlocked || isBelowMinimumBalance) && !covered),
   };
 };
 
@@ -251,7 +261,11 @@ export const applyDriverWalletAdjustment = async ({
 
   const before = await getWalletSnapshot(driver);
   const balanceAfter = Math.round((before.balance + normalizedAmount) * 100) / 100;
-  const isBlockedAfter = !before.rules.isWalletEnabled || balanceAfter < before.minimumBalanceForOrders;
+  // The subscription row is created before the debit that pays for it (same
+  // session), so a pass bought or granted right now already counts here.
+  const covered = await isCoveredBySubscription(driverId, { session });
+  const isBlockedAfter =
+    !before.rules.isWalletEnabled || (balanceAfter < before.minimumBalanceForOrders && !covered);
 
   const updatedDriver = await Driver.findByIdAndUpdate(
     driverId,
@@ -300,8 +314,48 @@ export const applyDriverWalletAdjustment = async ({
  *
  * Returns null when there was nothing to do, so callers can stay quiet.
  */
+// Fixed on purpose, not an admin setting. A driver on several classes gets the
+// richest of them; anything unrecognised falls back to DRIVER_JOINING_BONUS.
+const JOINING_BONUS_BY_CLASS = { bike: 100, auto: 100, car: 150 };
+
+const resolveJoiningBonus = async (driverId) => {
+  const driver = await Driver.findById(driverId).lean();
+  const classes = driver ? await getDriverVehicleClasses(driver) : [];
+  const amounts = classes
+    .map((vehicleClass) => JOINING_BONUS_BY_CLASS[vehicleClass])
+    .filter((value) => Number.isFinite(value));
+
+  if (amounts.length > 0) {
+    return { amount: Math.max(...amounts), classes };
+  }
+
+  return { amount: normalizeAmount(env.driverWallet.joiningBonus), classes };
+};
+
+/**
+ * Recomputes the stored wallet-blocked flag from the driver's balance and
+ * whether a pass is covering them. Run when a pass starts or ends, since the
+ * flag is otherwise only rewritten when money moves.
+ */
+export const syncDriverWalletBlockedFlag = async (driverId) => {
+  const driver = await Driver.findById(driverId);
+  if (!driver) return null;
+
+  const wallet = await getWalletSnapshot(driver);
+  const covered = await isCoveredBySubscription(driver._id);
+  const isBlocked =
+    !wallet.rules.isWalletEnabled || (wallet.balance < wallet.minimumBalanceForOrders && !covered);
+
+  if (Boolean(driver.wallet?.isBlocked) !== isBlocked) {
+    await Driver.updateOne({ _id: driver._id }, { $set: { 'wallet.isBlocked': isBlocked } });
+  }
+
+  return isBlocked;
+};
+
 export const grantDriverJoiningBonus = async ({ driverId, grantedBy = null }) => {
-  const amount = normalizeAmount(env.driverWallet.joiningBonus);
+  const { amount: bonusAmount, classes: bonusClasses } = await resolveJoiningBonus(driverId);
+  const amount = normalizeAmount(bonusAmount);
 
   if (!amount || amount <= 0) {
     return null;
@@ -322,7 +376,7 @@ export const grantDriverJoiningBonus = async ({ driverId, grantedBy = null }) =>
       amount,
       type: 'adjustment',
       description: 'Joining bonus on approval',
-      metadata: { reason: 'driver_joining_bonus', grantedBy },
+      metadata: { reason: 'driver_joining_bonus', grantedBy, vehicleClasses: bonusClasses },
     });
   } catch (error) {
     // Release the claim so a retry can still pay them. Leaving it set would mark

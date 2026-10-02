@@ -6,6 +6,7 @@ import { connectRedis, getRedisStatus } from './src/infrastructure/redis/redisCl
 import { configureTaxiSocketServer } from './src/modules/taxi/socket/index.js';
 import { User } from './src/modules/taxi/user/models/User.js';
 import { restoreScheduledDispatches, startDispatchRecoveryLoop } from './src/modules/taxi/services/dispatchService.js';
+import { startDriverSubscriptionExpiryLoop } from './src/modules/taxi/driver/services/driverSubscriptionExpiryService.js';
 
 const bootstrap = async () => {
   await connectDatabase();
@@ -24,6 +25,7 @@ const bootstrap = async () => {
   await configureTaxiSocketServer(httpServer);
   await restoreScheduledDispatches();
   startDispatchRecoveryLoop();
+  startDriverSubscriptionExpiryLoop();
 
   // Loopback by default: nginx is the only thing that should reach these
   // processes, and with several instances on 5000-5003 a public bind would let

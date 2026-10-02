@@ -30,13 +30,17 @@ const toList = (value) =>
 export const resolveDriverSubscriptionSettings = async () => {
   const group = (await getDriverSubscriptionSettings()) || {};
 
+  // A paid pass is mandatory for every driver, so the admin's mode / expiry
+  // behaviour / wallet-minimum switches no longer apply: with a pass the wallet
+  // balance is not checked, without one no ride is offered at all. Commission
+  // waiver, plans, payment methods and the cycle hour stay admin-controlled.
   return {
-    mode: String(group.subscription_mode || 'off').trim().toLowerCase(),
+    mode: 'subscription_only',
     waiveCommission: isOn(group.waive_commission, true),
-    waiveWalletMinimum: isOn(group.waive_wallet_minimum, true),
+    waiveWalletMinimum: true,
     multiVehicleRule: String(group.multi_vehicle_rule || 'highest').trim().toLowerCase(),
     paymentMethods: toList(group.payment_methods || 'wallet,gateway'),
-    onExpiry: String(group.on_expiry || 'commission').trim().toLowerCase(),
+    onExpiry: 'block',
     cycleStartHour: Math.min(23, Math.max(0, Number(group.cycle_start_hour ?? 6) || 0)),
     timezone: String(group.cycle_timezone || 'Asia/Kolkata').trim() || 'Asia/Kolkata',
   };
@@ -124,7 +128,7 @@ export const hasActiveDriverSubscription = async (driverId, options) =>
  * Which classes of vehicle a driver drives, from the catalog rather than the
  * free-text vehicleType on their record.
  */
-const getDriverVehicleClasses = async (driver) => {
+export const getDriverVehicleClasses = async (driver) => {
   const ids = [driver.vehicleTypeId, ...(driver.vehicleTypeIds || [])]
     .map((id) => String(id || '').trim())
     .filter((id) => /^[a-f\d]{24}$/i.test(id));
@@ -144,6 +148,10 @@ export const listPlansForDriver = async (driver) => {
   const plans = await SubscriptionPlan.find({ audience: 'driver', active: true }).lean();
 
   const matching = plans.filter((plan) => {
+    // A driver on a vehicle with no bike/auto/car class (e.g. a delivery truck)
+    // matches no plan by class. With a pass mandatory that would lock them out
+    // for good, so every plan is offered rather than none.
+    if (classes.length === 0) return true;
     const covers = (plan.vehicle_classes || []).map((value) => String(value).trim().toLowerCase());
     // A plan with no classes set covers everything, so a half-configured plan
     // is visible rather than silently unbuyable.
@@ -403,6 +411,11 @@ export const activateDriverSubscription = async ({ subscriptionId, paymentRefere
   ).lean();
 
   if (!updated) throw new ApiError(404, 'Subscription payment not found or already confirmed');
+
+  // The stored wallet-blocked flag may be set from a low balance; with a pass
+  // now active it must not keep the driver out of dispatch.
+  const { syncDriverWalletBlockedFlag } = await import('./walletService.js');
+  await syncDriverWalletBlockedFlag(updated.driverId).catch(() => null);
 
   return updated;
 };
