@@ -18,6 +18,7 @@ import { getRideRoom, resolveSetPriceForRide } from './rideService.js';
 import { SOCKET_EVENTS } from '../socket/events.js';
 import { resolveTransportDispatchConfig } from './transportSettingsService.js';
 import { sendPushNotificationToEntities } from './pushNotificationService.js';
+import { lifecycleEventForAcceptedRide, publishRideCancelled, publishRideLifecycle } from '../admin/operations/adminFeedService.js';
 
 const activeDispatches = new Map();
 let ioInstance = null;
@@ -953,6 +954,7 @@ const closeRideAsUnmatched = async (rideId) => {
     status: ride.status,
     liveStatus: ride.liveStatus,
   });
+  publishRideCancelled(ride, 'system', { reason: 'unmatched' });
 };
 
 export const cancelRideByAdmin = async (rideId) => {
@@ -1011,6 +1013,7 @@ export const cancelRideByAdmin = async (rideId) => {
   });
 
   stopDispatchFlow(rideId);
+  publishRideCancelled(ride, 'admin');
   return ride;
 };
 
@@ -1152,6 +1155,7 @@ export const cancelRideByUser = async ({ rideId, userId }) => {
   }
 
   stopDispatchFlow(rideId);
+  publishRideCancelled(ride, 'user');
   return ride;
 };
 
@@ -1303,6 +1307,7 @@ export const cancelScheduledRideByDriver = async ({ rideId, driverId }) => {
   });
 
   stopDispatchFlow(rideId);
+  publishRideCancelled(ride, 'driver');
   return ride;
 };
 
@@ -1678,6 +1683,7 @@ export const notifyRideAccepted = async (ride) => {
     liveStatus: populatedRide.liveStatus,
     acceptedAt: populatedRide.acceptedAt,
   });
+  publishRideLifecycle(lifecycleEventForAcceptedRide(populatedRide), populatedRide);
 
   emitToRoom(getDriverRoom(populatedRide.driverId._id), 'rideAccepted', {
     rideId: String(populatedRide._id),

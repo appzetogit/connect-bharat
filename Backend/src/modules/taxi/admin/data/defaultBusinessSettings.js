@@ -42,6 +42,10 @@ export const createDefaultBusinessSettings = () => ({
     enable_multiple_ride_feature: '1',
     enable_max_dist_feature: '1',
     enable_fixed_fare: '1',
+    // Admin operations gates (admin/operations). Both default off so existing
+    // approval and dispatch behaviour is unchanged until an admin opts in.
+    require_verified_documents_for_approval: '0',
+    require_vehicle_approval: '0',
     
     // Sign-in Toggles
     user_email_login: '1',

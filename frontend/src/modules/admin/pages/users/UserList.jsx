@@ -4,8 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Search, Download, UserPlus, MoreHorizontal,
   ChevronRight, UserCheck, Edit2, Lock, Trash2,
-  Loader2, Ban, FileText
+  Loader2, Ban, FileText, BadgeCheck
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const StatusToggle = ({ status, onToggle }) => (
   <button 
@@ -18,6 +19,9 @@ const StatusToggle = ({ status, onToggle }) => (
 
 import UserModal from './UserModal';
 import { adminService } from '../../services/adminService';
+import { operationsApi, unwrap } from '../../services/operationsApi';
+import ReasonDialog from '../../components/approvals/ReasonDialog';
+import { getApiErrorMessage } from '../../components/approvals/approvalUtils';
 
 const GENDER_LABELS = {
   male: 'Male',
@@ -43,6 +47,9 @@ const UserList = () => {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [page, setPage] = useState(1);
   const [paginator, setPaginator] = useState(null);
+  const [blockTarget, setBlockTarget] = useState(null); // { user, pendingUpdate? }
+  const [verifyTarget, setVerifyTarget] = useState(null);
+  const [isModerating, setIsModerating] = useState(false);
   const latestRequestId = useRef(0);
   const hasLoadedUsersRef = useRef(false);
 
@@ -80,6 +87,8 @@ const UserList = () => {
           acquiredByEmployeeCode: u.acquiredByEmployeeCode || '',
           acquiredByEmployeeName: u.acquiredByEmployeeName || '',
           status: u.active ? 'Active' : 'Suspended',
+          isVerified: Boolean(u.isVerified),
+          blockReason: u.blockReason || '',
         }));
         setUsers(mapped);
         setPaginator(resData.data?.paginator || null);
@@ -150,35 +159,100 @@ const UserList = () => {
     return () => window.removeEventListener('click', closeMenu);
   }, []);
 
-  const handleToggleStatus = async (userId, currentStatus) => {
-    const newStatus = currentStatus === 'Active' ? false : true;
-    const confirmed = window.confirm(`Are you sure you want to ${newStatus ? 'activate' : 'block'} this user?`);
-    if (!confirmed) return;
+  const applyModeration = (userId, data, fallback = {}) => {
+    setUsers((current) => current.map((u) => (
+      u.id === userId
+        ? {
+            ...u,
+            status: (data?.active ?? fallback.active ?? (u.status === 'Active')) ? 'Active' : 'Suspended',
+            isVerified: data?.isVerified ?? fallback.isVerified ?? u.isVerified,
+            blockReason: data?.blockReason ?? fallback.blockReason ?? u.blockReason,
+          }
+        : u
+    )));
+  };
+
+  const setBlocked = async (user, blocked, reason = '') => {
+    setIsModerating(true);
     try {
-      const resData = await adminService.updateUser(userId, { active: newStatus });
-      if (resData.success) {
-        setUsers(users.map(u => u.id === userId ? { ...u, status: newStatus ? 'Active' : 'Suspended' } : u));
-        toast?.success?.(`User ${newStatus ? 'activated' : 'blocked'} successfully`) || console.log('Status updated');
-      }
+      const resData = await operationsApi.setUserBlocked(user.id, blocked, reason);
+      applyModeration(user.id, unwrap(resData), { active: !blocked, blockReason: blocked ? reason : '' });
+      toast.success(`User ${blocked ? 'blocked' : 'unblocked'} successfully`);
+      return true;
     } catch (err) {
-      console.error('Failed to toggle status', err);
-      alert('Failed to update status');
+      console.error('Failed to update block status', err);
+      toast.error(getApiErrorMessage(err, 'Failed to update status'));
+      return false;
+    } finally {
+      setIsModerating(false);
     }
+  };
+
+  const handleToggleStatus = async (userId) => {
+    const user = users.find((u) => u.id === userId);
+    if (!user) return;
+    if (user.status === 'Active') {
+      setBlockTarget({ user });
+      return;
+    }
+    if (!window.confirm(`Unblock ${user.name}? They will be able to use their account again.`)) return;
+    await setBlocked(user, false);
   };
 
   const handleBlockUser = async (user) => {
     if (!user) return;
-    const shouldBlock = user.status === 'Active';
-    const confirmed = window.confirm(
-      shouldBlock
-        ? `Block ${user.name}? They will not be able to log in, open their profile, or register again with ${user.phone}.`
-        : `Unblock ${user.name}? They will be able to use their account again.`
-    );
-
-    if (!confirmed) return;
-
-    await handleToggleStatus(user.id, user.status);
     setActiveMenu(null);
+    await handleToggleStatus(user.id);
+  };
+
+  const handleConfirmBlock = async (reason) => {
+    if (!blockTarget?.user) return;
+    const { user, pendingUpdate } = blockTarget;
+    if (pendingUpdate) {
+      try {
+        setIsSubmitting(true);
+        const resData = await adminService.updateUser(user.id, pendingUpdate);
+        if (!resData.success) {
+          toast.error(resData.message || 'Operation failed');
+          return;
+        }
+      } catch (err) {
+        toast.error(getApiErrorMessage(err, 'Network error'));
+        return;
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+    const ok = await setBlocked(user, true, reason);
+    if (ok) setBlockTarget(null);
+    if (pendingUpdate) {
+      setIsModalOpen(false);
+      fetchUsers();
+    }
+  };
+
+  const setVerified = async (user, verified, note = '') => {
+    setIsModerating(true);
+    try {
+      const resData = await operationsApi.setUserVerified(user.id, verified, note);
+      applyModeration(user.id, unwrap(resData), { isVerified: verified });
+      toast.success(verified ? 'User verified' : 'User unverified');
+      setVerifyTarget(null);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Failed to update verification'));
+    } finally {
+      setIsModerating(false);
+    }
+  };
+
+  const handleVerifyUser = (user) => {
+    if (!user) return;
+    setActiveMenu(null);
+    if (user.isVerified) {
+      if (window.confirm(`Remove the verified badge from ${user.name}?`)) setVerified(user, false);
+      return;
+    }
+    setVerifyTarget(user);
   };
 
   const handleAddUser = () => { navigate('/admin/users/create'); };
@@ -195,13 +269,26 @@ const UserList = () => {
     }
   };
 
-  const handleModalSubmit = async (formData) => {
+  const handleModalSubmit = async (submitted) => {
+    let formData = submitted;
+    const wasActive = editingUser?.status === 'Active';
+    const activeChanged = Boolean(editingUser) && typeof submitted?.active === 'boolean' && submitted.active !== wasActive;
+    if (activeChanged) {
+      // Blocking / unblocking goes through the moderation endpoint (blocking needs a reason).
+      const { active, ...rest } = submitted;
+      if (!active) {
+        setBlockTarget({ user: editingUser, pendingUpdate: rest });
+        return;
+      }
+      formData = rest;
+    }
     try {
       setIsSubmitting(true);
       const resData = editingUser 
         ? await adminService.updateUser(editingUser.id, formData)
         : await adminService.createUser(formData);
       if (resData.success) {
+        if (activeChanged) await setBlocked(editingUser, false);
         setIsModalOpen(false);
         fetchUsers();
       } else {
@@ -402,6 +489,11 @@ const UserList = () => {
                         >
                           {user.name}
                         </button>
+                        {user.isVerified && (
+                          <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 align-middle">
+                            <BadgeCheck size={11} /> Verified
+                          </span>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -437,7 +529,12 @@ const UserList = () => {
                     )}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <StatusToggle status={user.status} onToggle={() => handleToggleStatus(user.id, user.status)} />
+                    <StatusToggle status={user.status} onToggle={() => handleToggleStatus(user.id)} />
+                    {user.status !== 'Active' && user.blockReason && (
+                      <p className="mx-auto mt-1 max-w-[160px] truncate text-[10px] text-rose-600" title={user.blockReason}>
+                        {user.blockReason}
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="relative">
@@ -498,6 +595,13 @@ const UserList = () => {
                 <Lock size={13} className="text-gray-500" /> Update Password
               </button>
               <button
+                onClick={() => handleVerifyUser(users.find((item) => item.id === activeMenu))}
+                className="w-full text-left px-3 py-2 text-xs font-bold text-gray-700 hover:bg-yellow-50 flex items-center gap-2"
+              >
+                <BadgeCheck size={13} className="text-gray-500" />
+                {users.find((item) => item.id === activeMenu)?.isVerified ? 'Unverify User' : 'Verify User'}
+              </button>
+              <button
                 onClick={() => { setActiveMenu(null); handleBlockUser(users.find((item) => item.id === activeMenu)); }}
                 className="w-full text-left px-3 py-2 text-xs font-bold text-gray-700 hover:bg-yellow-50 flex items-center gap-2"
               >
@@ -519,6 +623,30 @@ const UserList = () => {
         onSubmit={handleModalSubmit}
         editingUser={editingUser}
         isLoading={isSubmitting}
+      />
+
+      <ReasonDialog
+        open={Boolean(blockTarget)}
+        title={`Block ${blockTarget?.user?.name || 'user'}`}
+        description={`They will not be able to log in, open their profile, or register again with ${blockTarget?.user?.phone || 'this number'}.`}
+        placeholder="e.g. Repeated no-shows"
+        confirmLabel="Block user"
+        busy={isModerating || isSubmitting}
+        onClose={() => setBlockTarget(null)}
+        onConfirm={handleConfirmBlock}
+      />
+
+      <ReasonDialog
+        open={Boolean(verifyTarget)}
+        title={`Verify ${verifyTarget?.name || 'user'}`}
+        label="Note"
+        placeholder="e.g. Checked Aadhaar in person"
+        confirmLabel="Mark verified"
+        tone="primary"
+        required={false}
+        busy={isModerating}
+        onClose={() => setVerifyTarget(null)}
+        onConfirm={(note) => setVerified(verifyTarget, true, note)}
       />
     </div>
   );

@@ -212,6 +212,38 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    /// Audit for isVerified: which admin verified (or un-verified) the rider,
+    /// when, and why. Only written by PATCH /admin/users/:id/verify.
+    verifiedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Admin',
+      default: null,
+    },
+    verifiedAt: {
+      type: Date,
+      default: null,
+    },
+    verificationNote: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    /// Why the account was blocked (active:false), so support can answer the
+    /// rider and the next admin doesn't unblock by accident.
+    blockReason: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    blockedAt: {
+      type: Date,
+      default: null,
+    },
+    blockedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Admin',
+      default: null,
+    },
     isActive: {
       type: Boolean,
       default: true,

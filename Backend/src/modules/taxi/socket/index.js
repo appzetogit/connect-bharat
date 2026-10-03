@@ -34,6 +34,7 @@ import { authorizeRideRoomAccess } from './middleware/rideRoomAuth.js';
 import { attachSocketAuth } from './middleware/socketAuth.js';
 import { clearDriverRoute } from './services/driverRouteService.js';
 import { consumeScopedRateLimit } from '../middlewares/rateLimitMiddleware.js';
+import { publishDriverLocation } from '../admin/operations/adminFeedService.js';
 
 const DRIVER_LOCATION_WRITE_MIN_DISTANCE_METERS = 25;
 const DRIVER_LOCATION_WRITE_MAX_INTERVAL_MS = 15000;
@@ -371,6 +372,8 @@ export const configureTaxiSocketServer = async (httpServer) => {
         })
           .select('_id')
           .lean();
+
+        publishDriverLocation(identity.sub, { coordinates: normalizedCoords, heading: resolvedHeading, speed: normalizedSpeed, rideId: activeRide?._id, isOnRide: Boolean(activeRide) });
 
         if (activeRide) {
           await Ride.updateOne(

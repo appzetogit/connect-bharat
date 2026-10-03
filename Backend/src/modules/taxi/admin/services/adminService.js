@@ -85,6 +85,8 @@ import {
   normalizeAdminPermissions,
   normalizeAdminType,
 } from './adminAccessService.js';
+import { assertDriverDocumentsReadyForApproval } from '../operations/driverDocumentReviewService.js';
+import { getDashboardPaymentStats } from '../operations/dashboardAnalyticsService.js';
 
 const PUBLIC_VEHICLE_CATALOG_CACHE_TTL_MS = 5 * 60 * 1000;
 let publicVehicleCatalogCache = {
@@ -2692,6 +2694,8 @@ const serializeDriver = (driver) => ({
   deletedAt: driver.deletedAt || null,
   deletionRequest: driver.deletionRequest || { status: 'none' },
   documents: driver.documents || {},
+  rejectionReason: driver.rejectionReason || '',
+  vehicleApproval: driver.vehicleApproval || { status: 'pending' },
   onboarding: driver.onboarding || {},
   wallet: {
     balance: Number(driver.wallet?.balance || 0),
@@ -2823,6 +2827,8 @@ const serializeUser = (user) => ({
   deletedAt: user.deletedAt || null,
   deletion_reason: user.deletion_reason || '',
   deletionRequest: user.deletionRequest || { status: 'none' },
+  isVerified: Boolean(user.isVerified),
+  blockReason: user.blockReason || '',
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
 });
@@ -2844,6 +2850,8 @@ const USER_LIST_SELECT = [
   'deletedAt',
   'deletion_reason',
   'deletionRequest',
+  'isVerified',
+  'blockReason',
   'createdAt',
   'updatedAt',
 ].join(' ');
@@ -2873,6 +2881,8 @@ const serializeUserListItem = (user, employee = null) => ({
   deletedAt: user.deletedAt || null,
   deletion_reason: user.deletion_reason || '',
   deletionRequest: user.deletionRequest || { status: 'none' },
+  isVerified: Boolean(user.isVerified),
+  blockReason: user.blockReason || '',
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
 });
@@ -5387,6 +5397,10 @@ export const updateDriver = async (id, payload, currentAdmin = null) => {
   if (payload.onboarding !== undefined) {
     update.onboarding = payload.onboarding;
   }
+
+  // Refuses approval until every required document is approved, when
+  // customization.require_verified_documents_for_approval is '1' (off by default).
+  if (update.approve === true) await assertDriverDocumentsReadyForApproval(id);
 
   const driver = await Driver.findByIdAndUpdate(id, update, { returnDocument: 'after' });
   if (!driver) throw new ApiError(404, 'Driver not found');
@@ -8835,6 +8849,8 @@ export const getDashboardData = async () => {
     { pending: 0, assigned: 0, closed: 0 },
   );
 
+  const paymentStats = await getDashboardPaymentStats({ startOfToday, endOfToday }).catch(() => null);
+
   const snapshot = {
     totalUsers,
     totalDrivers: {
@@ -8844,7 +8860,7 @@ export const getDashboardData = async () => {
     },
     totalOwners,
     total_earnings: Number(totalOverallFare.toFixed(2)),
-    payment_success_rate: 99.4,
+    payment_success_rate: paymentStats?.successRate ?? null,
     notifiedSos: {
       total: supportTicketCounts.pending + supportTicketCounts.assigned,
       pending: supportTicketCounts.pending,
@@ -8866,7 +8882,7 @@ export const getDashboardData = async () => {
     todayEarnings: {
       total: Number(totalTodayFare.toFixed(2)),
       by_cash: Number(todayByCash.toFixed(2)),
-      by_wallet: 0,
+      by_wallet: paymentStats?.byWallet?.today ?? 0,
       by_card: Number(todayByCard.toFixed(2)),
       admin_commission: Number(totalTodayCommission.toFixed(2)),
       driver_earnings: Number(totalTodayDriverEarnings.toFixed(2)),
@@ -8874,7 +8890,7 @@ export const getDashboardData = async () => {
     overallEarnings: {
       total: Number(totalOverallFare.toFixed(2)),
       by_cash: Number(overallByCash.toFixed(2)),
-      by_wallet: 0,
+      by_wallet: paymentStats?.byWallet?.overall ?? 0,
       by_card: Number(overallByCard.toFixed(2)),
       admin_commission: Number(totalOverallCommission.toFixed(2)),
       driver_earnings: Number(totalOverallDriverEarnings.toFixed(2)),

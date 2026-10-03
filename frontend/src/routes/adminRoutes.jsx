@@ -1,3 +1,4 @@
+import { lazy } from 'react';
 import { FileText } from 'lucide-react';
 import { Navigate, Route, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -144,6 +145,8 @@ import {
   AdminUserAppManagement,
 } from './lazyPages';
 
+const AdminOperationsAnalytics = lazy(() => import('../modules/admin/pages/dashboard/OperationsAnalytics'));
+
 const AdminReportPlaceholder = ({ title }) => (
   <div className="flex flex-col items-center justify-center min-h-[500px] text-gray-400 bg-white rounded-[32px] border border-gray-100 shadow-sm p-10 mx-6">
     <FileText size={60} strokeWidth={1} className="mb-6 opacity-20" />
@@ -201,6 +204,7 @@ const adminRoutes = (
     <Route path="/admin" element={<AdminLayout />}>
       <Route index element={<Navigate to="/admin/dashboard" />} />
       <Route path="dashboard" element={<AdminDashboard />} />
+      <Route path="dashboard/analytics" element={<AdminOperationsAnalytics />} />
       <Route path="earnings" element={<AdminEarnings />} />
       <Route path="chat" element={<AdminChat />} />
       <Route path="trips" element={<AdminTrips />} />

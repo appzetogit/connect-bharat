@@ -215,6 +215,14 @@ const MainDashboard = () => {
             <h1>Executive Control Center</h1>
           </div>
           <div className="flex items-center gap-3 text-xs">
+            <button
+              onClick={() => navigate('/admin/dashboard/analytics')}
+              className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-[#E5E7EB] shadow-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              title="Operations analytics"
+            >
+              <BarChart3 size={14} className="text-[#64748B]" />
+              Operations analytics
+            </button>
             <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-[#E5E7EB] shadow-sm">
               <Clock size={14} className="text-[#64748B]" />
               <span className="font-semibold text-slate-700">

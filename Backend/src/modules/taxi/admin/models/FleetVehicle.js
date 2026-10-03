@@ -64,6 +64,17 @@ const fleetVehicleSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    /// Who last approved or rejected this vehicle, and when. Written by the
+    /// dedicated approve/reject endpoints so a status change has an author.
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Admin',
+      default: null,
+    },
+    reviewedAt: {
+      type: Date,
+      default: null,
+    },
     active: {
       type: Boolean,
       default: true,

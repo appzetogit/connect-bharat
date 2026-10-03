@@ -1,25 +1,42 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   GoogleMap, 
   MarkerF, 
   MarkerClustererF, 
   TrafficLayer, 
-  HeatmapLayerF 
+  HeatmapLayerF,
+  PolylineF
 } from '@react-google-maps/api';
 import { 
   Search, Filter, Activity, Users, Car, AlertTriangle, IndianRupee, Clock,
   Map as MapIcon, X, Maximize, Minimize, Crosshair, Layers, Flame, Navigation, ArrowLeft, RefreshCw,
-  Battery, Gauge, MapPin, Phone, User as UserIcon, ShieldAlert, CheckCircle2, XCircle
+  Battery, Gauge, MapPin, Phone, User as UserIcon, ShieldAlert, CheckCircle2, XCircle, History, Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useBaseGoogleMapsLoader, HAS_VALID_GOOGLE_MAPS_KEY } from '../../utils/googleMaps';
 import { adminService } from '../../services/adminService';
+import { operationsApi, ADMIN_FEED_EVENTS, unwrap } from '../../services/operationsApi';
+import { socketService } from '../../../../shared/api/socket';
 
 import CarIcon from '@/assets/icons/car.png';
 import BikeIcon from '@/assets/icons/bike.png';
 import AutoIcon from '@/assets/icons/auto.png';
 
 const INDIA_CENTER = { lat: 22.7196, lng: 75.8577 };
+
+// While the admin socket is connected, positions arrive live, so polling only
+// needs to catch what the socket cannot (new drivers, status, metrics).
+const LIVE_MIN_POLL_SECONDS = 60;
+const LIFECYCLE_DEBOUNCE_MS = 3000;
+const TRAIL_WINDOW_MS = 2 * 60 * 60 * 1000;
+
+const driverKey = (driver) => String(driver?._id || driver?.id || '');
+
+const formatTrailTime = (value) => {
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return '-';
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+};
 
 const mapOptions = {
   disableDefaultUI: true, // we build our own floating controls
@@ -126,6 +143,12 @@ const GodsEye = () => {
   // Selection
   const [selectedDriver, setSelectedDriver] = useState(null);
 
+  // Live feed + trail
+  const [socketLive, setSocketLive] = useState(() => socketService.isConnected());
+  const [trail, setTrail] = useState(null); // { driverId, points, loading, error, distanceMeters, truncated }
+  const [trailIndex, setTrailIndex] = useState(0);
+  const [initialCenter, setInitialCenter] = useState(null);
+
   // Fetch Logic
   const fetchMapData = useCallback(async () => {
     setLoading(true);
@@ -142,7 +165,13 @@ const GodsEye = () => {
       const ridesList = ridesRes.status === 'fulfilled' ? (ridesRes.value?.data?.results || ridesRes.value?.data || []) : [];
       const alertsList = alertsRes.status === 'fulfilled' ? (alertsRes.value?.data?.results || alertsRes.value?.data || []) : [];
       
-      setDrivers(Array.isArray(drvList) ? drvList : []);
+      const nextDrivers = Array.isArray(drvList) ? drvList : [];
+      setDrivers(nextDrivers);
+      // Keep the open drawer in step with the refreshed record.
+      setSelectedDriver(prev => {
+        if (!prev) return prev;
+        return nextDrivers.find(d => driverKey(d) === driverKey(prev)) || prev;
+      });
       setRides(Array.isArray(ridesList) ? ridesList : []);
       setAlerts(Array.isArray(alertsList) ? alertsList : []);
       
@@ -165,10 +194,120 @@ const GodsEye = () => {
     if (filters.refreshMode === 'manual') return;
     const seconds = parseInt(filters.refreshMode, 10);
     if (!isNaN(seconds) && seconds > 0) {
-      const interval = setInterval(fetchMapData, seconds * 1000);
+      const effective = socketLive ? Math.max(seconds, LIVE_MIN_POLL_SECONDS) : seconds;
+      const interval = setInterval(fetchMapData, effective * 1000);
       return () => clearInterval(interval);
     }
-  }, [filters.refreshMode, fetchMapData]);
+  }, [filters.refreshMode, fetchMapData, socketLive]);
+
+  // Live admin feed: move markers in place, refetch (debounced) on ride lifecycle.
+  const fetchMapDataRef = useRef(fetchMapData);
+  useEffect(() => { fetchMapDataRef.current = fetchMapData; }, [fetchMapData]);
+
+  useEffect(() => {
+    socketService.connect({ role: 'admin' });
+    let lifecycleTimer = null;
+
+    const applyLocation = (driver, payload) => ({
+      ...driver,
+      latitude: Number(payload.lat),
+      longitude: Number(payload.lng),
+      ...(payload.heading !== null && payload.heading !== undefined && Number.isFinite(Number(payload.heading)) ? { heading: Number(payload.heading) } : {}),
+      ...(typeof payload.isOnRide === 'boolean' ? { isOnRide: payload.isOnRide } : {}),
+      ...(payload.updatedAt ? { location_updated_at: payload.updatedAt } : {}),
+    });
+
+    const onDriverLocation = (payload) => {
+      const id = String(payload?.driverId || '');
+      if (!id || !hasUsableCoordinates(payload.lat, payload.lng)) return;
+      setDrivers(prev => {
+        const idx = prev.findIndex(d => driverKey(d) === id);
+        if (idx < 0) return prev;
+        const next = prev.slice();
+        next[idx] = applyLocation(prev[idx], payload);
+        return next;
+      });
+      setSelectedDriver(prev => (prev && driverKey(prev) === id ? applyLocation(prev, payload) : prev));
+    };
+
+    const onLifecycle = () => {
+      if (lifecycleTimer) clearTimeout(lifecycleTimer);
+      lifecycleTimer = setTimeout(() => {
+        lifecycleTimer = null;
+        fetchMapDataRef.current();
+      }, LIFECYCLE_DEBOUNCE_MS);
+    };
+
+    const onConnect = () => setSocketLive(true);
+    const onDisconnect = () => setSocketLive(false);
+
+    socketService.on(ADMIN_FEED_EVENTS.DRIVER_LOCATION, onDriverLocation);
+    socketService.on(ADMIN_FEED_EVENTS.RIDE_LIFECYCLE, onLifecycle);
+    socketService.on('connect', onConnect);
+    socketService.on('disconnect', onDisconnect);
+    setSocketLive(socketService.isConnected());
+
+    return () => {
+      if (lifecycleTimer) clearTimeout(lifecycleTimer);
+      socketService.off(ADMIN_FEED_EVENTS.DRIVER_LOCATION, onDriverLocation);
+      socketService.off(ADMIN_FEED_EVENTS.RIDE_LIFECYCLE, onLifecycle);
+      socketService.off('connect', onConnect);
+      socketService.off('disconnect', onDisconnect);
+    };
+  }, []);
+
+  // Drop the trail when another driver (or none) is selected.
+  const selectedDriverKey = driverKey(selectedDriver);
+  useEffect(() => {
+    setTrail(prev => (prev && prev.driverId !== selectedDriverKey ? null : prev));
+  }, [selectedDriverKey]);
+
+  const loadTrail = async () => {
+    const id = selectedDriverKey;
+    if (!id) return;
+    setTrail({ driverId: id, points: [], loading: true, error: '' });
+    setTrailIndex(0);
+    try {
+      const response = await operationsApi.getDriverLocationHistory(id, {
+        from: new Date(Date.now() - TRAIL_WINDOW_MS).toISOString(),
+      });
+      const data = unwrap(response) || {};
+      const points = (Array.isArray(data.points) ? data.points : [])
+        .filter(p => hasUsableCoordinates(p?.lat, p?.lng))
+        .map(p => ({ lat: Number(p.lat), lng: Number(p.lng), at: p.at }));
+      setTrail(prev => (prev && prev.driverId === id ? {
+        driverId: id,
+        points,
+        loading: false,
+        error: '',
+        distanceMeters: Number(data.distanceMeters) || 0,
+        truncated: Boolean(data.truncated),
+      } : prev));
+      setTrailIndex(points.length > 0 ? points.length - 1 : 0);
+      if (mapInstance && points.length > 1 && window.google?.maps) {
+        const bounds = new window.google.maps.LatLngBounds();
+        points.forEach(p => bounds.extend(p));
+        mapInstance.fitBounds(bounds, 60);
+      } else if (mapInstance && points.length === 1) {
+        mapInstance.panTo(points[0]);
+      }
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || 'Failed to load trail';
+      setTrail(prev => (prev && prev.driverId === id ? { driverId: id, points: [], loading: false, error: message } : prev));
+    }
+  };
+
+  const clearTrail = () => {
+    setTrail(null);
+    setTrailIndex(0);
+  };
+
+  const trailPoints = useMemo(() => trail?.points || [], [trail]);
+  const trailCursor = trailPoints.length > 0 ? trailPoints[Math.min(trailIndex, trailPoints.length - 1)] : null;
+  const trailTraversed = useMemo(
+    () => trailPoints.slice(0, Math.min(trailIndex, trailPoints.length - 1) + 1),
+    [trailPoints, trailIndex],
+  );
 
   // Handle Fullscreen
   useEffect(() => {
@@ -268,9 +407,22 @@ const GodsEye = () => {
     }
   };
 
-  const mapCenter = filteredDrivers.length > 0 && controls.autoFollow && selectedDriver
-    ? { lat: Number(selectedDriver.latitude), lng: Number(selectedDriver.longitude) }
-    : (filteredDrivers.length > 0 ? { lat: Number(filteredDrivers[0].latitude), lng: Number(filteredDrivers[0].longitude) } : INDIA_CENTER);
+  // The map's center prop is set once (first driver seen); a fresh object each
+  // render would snap the map back on every live position update.
+  useEffect(() => {
+    if (!initialCenter && filteredDrivers.length > 0) {
+      setInitialCenter({ lat: Number(filteredDrivers[0].latitude), lng: Number(filteredDrivers[0].longitude) });
+    }
+  }, [filteredDrivers, initialCenter]);
+
+  const selectedLat = selectedDriver ? Number(selectedDriver.latitude) : null;
+  const selectedLng = selectedDriver ? Number(selectedDriver.longitude) : null;
+  useEffect(() => {
+    if (!mapInstance || !controls.autoFollow || !hasUsableCoordinates(selectedLat, selectedLng)) return;
+    mapInstance.panTo({ lat: selectedLat, lng: selectedLng });
+  }, [mapInstance, controls.autoFollow, selectedLat, selectedLng]);
+
+  const mapCenter = initialCenter || INDIA_CENTER;
 
   return (
     <div className={`flex flex-col h-screen bg-gray-50 font-sans ${controls.fullscreen ? 'fixed inset-0 z-50' : ''}`}>
@@ -285,7 +437,11 @@ const GodsEye = () => {
            )}
            <div>
              <h1 className="text-base font-bold text-gray-900">God's Eye Dashboard</h1>
-             <p className="text-xs font-semibold text-gray-500">
+             <p className="text-xs font-semibold text-gray-500 flex items-center gap-1.5">
+                <span
+                  title={socketLive ? 'Receiving live driver positions' : 'Live feed unavailable, using polling'}
+                  className={`inline-block w-1.5 h-1.5 rounded-full ${socketLive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}
+                />
                 Live Fleet Monitoring {lastSync && ` • Synced ${lastSync.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}`}
              </p>
            </div>
@@ -511,6 +667,34 @@ const GodsEye = () => {
                         ))
                      ) : null}
 
+                     {trailPoints.length > 1 && (
+                        <>
+                           <PolylineF
+                              path={trailPoints}
+                              options={{ strokeColor: '#0F172A', strokeOpacity: 0.55, strokeWeight: 4, clickable: false, zIndex: 50 }}
+                           />
+                           <PolylineF
+                              path={trailTraversed}
+                              options={{ strokeColor: '#EAB308', strokeOpacity: 0.95, strokeWeight: 5, clickable: false, zIndex: 51 }}
+                           />
+                        </>
+                     )}
+                     {trailCursor && (
+                        <MarkerF
+                           position={{ lat: trailCursor.lat, lng: trailCursor.lng }}
+                           clickable={false}
+                           zIndex={1000}
+                           icon={{
+                              path: window.google.maps.SymbolPath.CIRCLE,
+                              scale: 7,
+                              fillColor: '#FACC15',
+                              fillOpacity: 1,
+                              strokeColor: '#0F172A',
+                              strokeWeight: 2,
+                           }}
+                        />
+                     )}
+
                   </GoogleMap>
                ) : (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50">
@@ -658,6 +842,59 @@ const GodsEye = () => {
                            </div>
                         </div>
                      </div>
+                  </div>
+
+                  {/* Location Trail */}
+                  <div className="space-y-2">
+                     <h4 className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Location Trail</h4>
+                     {!trail ? (
+                        <button onClick={loadTrail} className={btnSecondary + " w-full"}>
+                           <History size={14} /> Show trail (last 2h)
+                        </button>
+                     ) : trail.loading ? (
+                        <div className="flex items-center justify-center gap-2 py-3 text-xs font-bold text-gray-500">
+                           <Loader2 size={14} className="animate-spin text-yellow-500" /> Loading trail...
+                        </div>
+                     ) : trail.error ? (
+                        <div className="bg-red-50 border border-red-100 rounded-lg p-2.5 text-xs font-semibold text-red-600 space-y-2">
+                           <p>{trail.error}</p>
+                           <div className="flex gap-2">
+                              <button onClick={loadTrail} className="px-2 py-1 bg-red-100 text-red-700 rounded text-[10px] font-bold hover:bg-red-200">Retry</button>
+                              <button onClick={clearTrail} className="px-2 py-1 bg-white text-gray-700 border border-gray-200 rounded text-[10px] font-bold hover:bg-gray-50">Dismiss</button>
+                           </div>
+                        </div>
+                     ) : trailPoints.length === 0 ? (
+                        <div className="bg-gray-50 border border-gray-100 rounded-lg p-2.5 text-xs font-medium text-gray-500 space-y-2">
+                           <p>No location points recorded in the last 2 hours.</p>
+                           <button onClick={clearTrail} className="px-2 py-1 bg-white text-gray-700 border border-gray-200 rounded text-[10px] font-bold hover:bg-gray-50">Dismiss</button>
+                        </div>
+                     ) : (
+                        <div className="bg-gray-50 border border-gray-100 rounded-lg p-2.5 space-y-2">
+                           <div className="flex justify-between items-center text-[10px] font-bold text-gray-500">
+                              <span>{trailPoints.length} points</span>
+                              {trail.distanceMeters > 0 && <span>{(trail.distanceMeters / 1000).toFixed(1)} km</span>}
+                           </div>
+                           <input
+                              type="range"
+                              min={0}
+                              max={Math.max(trailPoints.length - 1, 0)}
+                              value={Math.min(trailIndex, trailPoints.length - 1)}
+                              onChange={e => setTrailIndex(Number(e.target.value))}
+                              className="w-full accent-yellow-400"
+                           />
+                           <div className="flex justify-between items-center text-[10px] font-semibold text-gray-400">
+                              <span>{formatTrailTime(trailPoints[0]?.at)}</span>
+                              <span className="text-xs font-black text-black">{formatTrailTime(trailCursor?.at)}</span>
+                              <span>{formatTrailTime(trailPoints[trailPoints.length - 1]?.at)}</span>
+                           </div>
+                           {trail.truncated && (
+                              <p className="text-[10px] font-medium text-yellow-700">Trail truncated to the first 20,000 points.</p>
+                           )}
+                           <button onClick={clearTrail} className={btnSecondary + " w-full !py-1.5 !text-xs"}>
+                              <X size={12} /> Clear trail
+                           </button>
+                        </div>
+                     )}
                   </div>
 
                   {/* Trip Info if on trip */}

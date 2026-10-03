@@ -262,6 +262,7 @@ import {
 } from '../controllers/cancellationReasonController.js';
 import { promotionsRouter } from '../promotions/routes/index.js';
 import { listSafetyAlerts, resolveSafetyAlert } from '../../safety/controllers/safetyController.js';
+import { adminOperationsRouter } from '../operations/routes.js';
 
 export const adminRouter = Router();
 
@@ -557,3 +558,6 @@ adminRouter.get('/admin/price-hikes', getPriceHikes);
 adminRouter.post('/admin/price-hikes', createPriceHike);
 adminRouter.patch('/admin/price-hikes/:id', updatePriceHike);
 adminRouter.delete('/admin/price-hikes/:id', deletePriceHike);
+
+// Admin operations: assignment, live feed, dashboard, approvals (admin/operations).
+adminRouter.use('/', adminOperationsRouter);

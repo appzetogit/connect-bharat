@@ -66,6 +66,37 @@ const rideSchema = new mongoose.Schema(
         default: null,
       },
     },
+    /// Set only when an admin put a driver on this ride by hand (manual
+    /// assignment or reassignment). Absent for rides a driver accepted.
+    assignedBy: {
+      adminId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Admin',
+        default: null,
+      },
+      at: {
+        type: Date,
+        default: null,
+      },
+      mode: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      previousDriverId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'TaxiDriver',
+        default: null,
+      },
+    },
+    /// Who called the ride off: user, driver, admin or system (no driver
+    /// found). Recorded so the dashboard can split cancellations by actor;
+    /// rides cancelled before this field existed read as ''.
+    cancelledByRole: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     vehicleIconType: {
       type: String,
       default: '',

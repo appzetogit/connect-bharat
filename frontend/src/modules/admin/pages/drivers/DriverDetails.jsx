@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { adminService } from '../../services/adminService';
+import DocumentReviewPanel from '../../components/approvals/DocumentReviewPanel';
 import { DELHI_CENTER, HAS_VALID_GOOGLE_MAPS_KEY, useBaseGoogleMapsLoader } from '../../utils/googleMaps';
 import BikeIcon from '@/assets/icons/bike.png';
 import CarIcon from '@/assets/icons/car.png';
@@ -1035,6 +1036,8 @@ const DriverDetails = () => {
 
           {activeTab === 'Documents' && (
             <div className="space-y-6">
+              <DocumentReviewPanel driverId={id} />
+
               <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
