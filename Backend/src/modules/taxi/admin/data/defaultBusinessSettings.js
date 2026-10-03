@@ -23,6 +23,9 @@ export const createDefaultBusinessSettings = () => ({
     enable_waze_navigation: '1',
     show_instant_ride_feature_on_mobile_app: '1',
     enable_outstation_round_trip: '1',
+    // Outstation: the driver must record (and photograph) the odometer before
+    // starting and before completing a trip. Off until the driver apps ship it.
+    require_outstation_odometer: '0',
     show_incentive_feature_for_driver: '1',
     enable_driver_loyalty: '1',
     enable_country_restrict_on_map: '1',
@@ -86,6 +89,16 @@ export const createDefaultBusinessSettings = () => ({
     enable_shipment_unload_feature: '1',
     enable_digital_signature: '1',
     enable_eta_price_on_complete: '1',
+    // Outstation advance (Set Price outstation_advance_type/value): minutes a
+    // booking waits for it before it is cancelled.
+    outstation_advance_timeout_minutes: '15',
+    // A paid advance on a ride that is then cancelled goes back to the rider's
+    // wallet. Any cancellation fee is still settled by the cancel path.
+    outstation_advance_refund_to_wallet: '1',
+    // Charge the recomputed outstation fare (actual km, extra time, waiting,
+    // extra days, tolls) at completion. Off: the result is only recorded on
+    // ride.fareAdjustment as a dry run for comparison.
+    enable_outstation_final_fare_adjustment: '0',
     enable_secondary_ride: '0',
     max_dist_secondary_ride: '2',
     enable_my_route_booking_feature: '0',

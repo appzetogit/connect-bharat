@@ -8,6 +8,7 @@ import { WalletTransaction } from '../models/WalletTransaction.js';
 import { Ride } from '../../user/models/Ride.js';
 import { DriverSubscription } from '../models/DriverSubscription.js';
 import { getWalletSettings } from '../../services/appSettingsService.js';
+import { advancePaidAmount } from '../../outstation/services/outstationFare.js';
 import {
   getActiveDriverSubscription,
   getDriverVehicleClasses,
@@ -479,8 +480,11 @@ export const settleCompletedRideWallet = async ({ rideId }) => {
     const commissionAmount = Math.min(Math.round((chargeableCommission + platformFee) * 100) / 100, fare);
     const paymentMethod = normalizePaymentMethod(ride.paymentMethod);
     const driverEarnings = Math.max(Math.round((fare - commissionAmount) * 100) / 100, 0);
-    const amount = paymentMethod === 'cash' ? -commissionAmount : driverEarnings;
-    const type = paymentMethod === 'cash' ? 'commission_deduction' : 'ride_earning';
+    // An outstation advance was collected online by admin, so on a cash ride
+    // the driver only took fare - advance in hand and is owed the advance back.
+    const advancePaid = Math.min(advancePaidAmount(ride), fare);
+    const amount = paymentMethod === 'cash' ? Math.round((advancePaid - commissionAmount) * 100) / 100 : driverEarnings;
+    const type = paymentMethod === 'cash' && amount < 0 ? 'commission_deduction' : 'ride_earning';
 
     ride.paymentMethod = paymentMethod;
     ride.commissionAmount = commissionAmount;

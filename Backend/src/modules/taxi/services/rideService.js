@@ -25,6 +25,7 @@ import { resolveRideRoute } from './routeService.js';
 import { computePackageFare, quoteFareForPricingRule } from './fareEngineService.js';
 import { getTransportRideSettings } from './transportSettingsService.js';
 import { findZoneByPickup } from './matchingService.js';
+import { applyOutstationFinalFare, assertOutstationOdometer, buildOutstationBookingFields, quoteOutstationFare, serializeOutstationRealtime } from '../outstation/services/outstationHooks.js';
 
 const clearUserActiveRideIfPresent = async (user) => {
   if (!user?.currentRideId) {
@@ -1093,6 +1094,9 @@ const resolveBookingFare = async ({
     if (!hasOutstationRates) {
       return { fare: clientFare, fareSource: 'client', fareBreakdown: null };
     }
+    // Round trip / multi-day distance, per-day minimum km and allowances.
+    const outstationQuote = await quoteOutstationFare({ pricingRule, distanceMeters, durationMinutes, intercity, zone, zoneId, serviceLocationId, at, settings });
+    if (outstationQuote && outstationQuote.total > 0) return { fare: outstationQuote.total, fareSource: 'server', fareBreakdown: outstationQuote };
   }
 
   if (wantsServerFare && pricingRule) {
@@ -1434,6 +1438,8 @@ export const createRideRecord = async ({
     throw new ApiError(400, 'Promo codes cannot be combined with subscription rides');
   }
 
+  const outstationFields = await buildOutstationBookingFields({ serviceType: normalizedServiceType, intercity: normalizeIntercityPayload(intercity), rawIntercity: intercity, fare: safeFare, pricingRule, fareBreakdown, scheduledAt: normalizedScheduledAt, subscriptionCovered: isSubscriptionCovered });
+
   if (!promoCode) {
     const ride = await Ride.create({
       userId,
@@ -1469,6 +1475,7 @@ export const createRideRecord = async ({
       pricingSnapshot,
       parcel: normalizeParcelPayload(parcel),
       intercity: normalizeIntercityPayload(intercity),
+      ...outstationFields,
       scheduledAt: normalizedScheduledAt,
       status: RIDE_STATUS.SEARCHING,
       liveStatus: RIDE_LIVE_STATUS.SEARCHING,
@@ -1525,6 +1532,7 @@ export const createRideRecord = async ({
             pricingSnapshot,
             parcel: normalizeParcelPayload(parcel),
             intercity: normalizeIntercityPayload(intercity),
+            ...outstationFields,
             scheduledAt: normalizedScheduledAt,
             status: RIDE_STATUS.SEARCHING,
             liveStatus: RIDE_LIVE_STATUS.SEARCHING,
@@ -1666,6 +1674,7 @@ export const serializeRideRealtime = (ride) => ({
   otp: ride.otp || '',
   parcel: ride.deliveryId?.parcel || ride.parcel || null,
   intercity: ride.intercity || null,
+  ...serializeOutstationRealtime(ride),
   commissionAmount: ride.commissionAmount,
   driverEarnings: ride.driverEarnings,
   promo: ride.promo?.code ? ride.promo : null,
@@ -2117,6 +2126,7 @@ export const updateRideLifecycle = async ({ rideId, driverId, nextStatus, paymen
   }
 
   assertParcelProof(ride, nextStatus);
+  await assertOutstationOdometer(ride, nextStatus);
 
   if (!config.allowedCurrent.includes(ride.liveStatus)) {
     throw new ApiError(409, `Ride cannot move from ${ride.liveStatus} to ${nextStatus}`);
@@ -2144,6 +2154,7 @@ export const updateRideLifecycle = async ({ rideId, driverId, nextStatus, paymen
   if (nextStatus === RIDE_LIVE_STATUS.COMPLETED) {
     ride.completedAt = new Date();
     await applyParcelWaitingCharge(ride);
+    await applyOutstationFinalFare(ride);
   }
 
   await ride.save();

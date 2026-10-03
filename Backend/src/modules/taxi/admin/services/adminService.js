@@ -2093,6 +2093,11 @@ const serializeSetPrice = (item) => ({
   outstation_base_distance: item.outstation_base_distance ?? 0,
   outstation_price_per_distance: item.outstation_price_per_distance ?? 0,
   outstation_time_price: item.outstation_time_price ?? 0,
+  outstation_min_km_per_day: item.outstation_min_km_per_day ?? 0,
+  outstation_driver_allowance_per_day: item.outstation_driver_allowance_per_day ?? 0,
+  outstation_night_allowance_per_night: item.outstation_night_allowance_per_night ?? 0,
+  outstation_advance_type: item.outstation_advance_type || 'none',
+  outstation_advance_value: item.outstation_advance_value ?? 0,
   free_waiting_before: item.free_waiting_before,
   free_waiting_after: item.free_waiting_after,
   minimum_fare: item.minimum_fare ?? 0,
@@ -7270,6 +7275,11 @@ export const listSetPrices = async (queryArgs = {}, currentAdmin = null) => {
       outstation_base_distance: Number(item.outstation_base_distance ?? 0),
       outstation_price_per_distance: Number(item.outstation_price_per_distance ?? 0),
       outstation_time_price: Number(item.outstation_time_price ?? 0),
+      outstation_min_km_per_day: Number(item.outstation_min_km_per_day ?? 0),
+      outstation_driver_allowance_per_day: Number(item.outstation_driver_allowance_per_day ?? 0),
+      outstation_night_allowance_per_night: Number(item.outstation_night_allowance_per_night ?? 0),
+      outstation_advance_type: item.outstation_advance_type || 'none',
+      outstation_advance_value: Number(item.outstation_advance_value ?? 0),
       minimum_fare: Number(item.minimum_fare ?? 0),
       night_charge_type: item.night_charge_type || 'percentage',
       night_charge: Number(item.night_charge ?? 0),
@@ -7612,6 +7622,11 @@ export const createSetPrice = async (payload, currentAdmin = null) => {
     outstation_base_distance: Number(payload.outstation_base_distance ?? 0),
     outstation_price_per_distance: Number(payload.outstation_price_per_distance ?? 0),
     outstation_time_price: Number(payload.outstation_time_price ?? 0),
+    outstation_min_km_per_day: Math.max(0, Number(payload.outstation_min_km_per_day ?? 0) || 0),
+    outstation_driver_allowance_per_day: Math.max(0, Number(payload.outstation_driver_allowance_per_day ?? 0) || 0),
+    outstation_night_allowance_per_night: Math.max(0, Number(payload.outstation_night_allowance_per_night ?? 0) || 0),
+    outstation_advance_type: ['percentage', 'fixed'].includes(payload.outstation_advance_type) ? payload.outstation_advance_type : 'none',
+    outstation_advance_value: Math.max(0, Number(payload.outstation_advance_value ?? 0) || 0),
     free_waiting_before: Number(payload.free_waiting_before ?? 0),
     free_waiting_after: Number(payload.free_waiting_after ?? 0),
     minimum_fare: Math.max(0, Number(payload.minimum_fare ?? 0) || 0),
@@ -7664,6 +7679,8 @@ export const updateSetPrice = async (id, payload, currentAdmin = null) => {
     'base_price', 'base_distance', 'price_per_distance', 'time_price',
     'waiting_charge', 'outstation_base_price', 'outstation_base_distance',
     'outstation_price_per_distance', 'outstation_time_price',
+    'outstation_min_km_per_day', 'outstation_driver_allowance_per_day', 'outstation_night_allowance_per_night',
+    'outstation_advance_type', 'outstation_advance_value',
     'free_waiting_before', 'free_waiting_after',
     'minimum_fare', 'night_charge_type', 'night_charge', 'night_start_time', 'night_end_time',
     'enable_shared_ride', 'enable_ride_sharing', 'price_per_seat',
@@ -7690,6 +7707,10 @@ export const updateSetPrice = async (id, payload, currentAdmin = null) => {
     'outstation_base_distance',
     'outstation_price_per_distance',
     'outstation_time_price',
+    'outstation_min_km_per_day',
+    'outstation_driver_allowance_per_day',
+    'outstation_night_allowance_per_night',
+    'outstation_advance_value',
     'free_waiting_before',
     'free_waiting_after',
     'minimum_fare',
@@ -7738,6 +7759,7 @@ export const updateSetPrice = async (id, payload, currentAdmin = null) => {
     if (field === 'package_type_id') value = payload.package_type_id?._id || payload.package_type_id?.id || payload.package_type_id;
     if (field === 'transport_type' && reconciledVehicleAndTransport) value = reconciledVehicleAndTransport.transportType;
     if (field === 'transport_type' && !reconciledVehicleAndTransport && value !== undefined) value = normalizeVehicleTransportType(value);
+    if (field === 'outstation_advance_type' && value !== undefined) value = ['percentage', 'fixed'].includes(value) ? value : 'none';
 
     if (currentAdmin && value !== undefined) {
       if (field === 'zone_id' && value) {
