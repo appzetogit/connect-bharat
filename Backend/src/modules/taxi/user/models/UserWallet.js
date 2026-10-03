@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { userWalletLedgerPlugin } from '../../payments/plugins/walletLedgerPlugins.js';
 
 const walletTransactionSchema = new mongoose.Schema(
   {
@@ -73,5 +74,8 @@ const userWalletSchema = new mongoose.Schema(
 );
 
 userWalletSchema.index({ userId: 1 }, { unique: true });
+/// Mirrors every wallet movement into the unified ledger (the embedded
+/// array above stays capped at 50 for app compatibility).
+userWalletSchema.plugin(userWalletLedgerPlugin);
 
 export const UserWallet = mongoose.models.TaxiUserWallet || mongoose.model('TaxiUserWallet', userWalletSchema);

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { driverWalletTransactionLedgerPlugin } from '../../payments/plugins/walletLedgerPlugins.js';
 
 const walletTransactionSchema = new mongoose.Schema(
   {
@@ -16,7 +17,9 @@ const walletTransactionSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['ride_earning', 'commission_deduction', 'top_up', 'adjustment', 'subscription_purchase'],
+      // 'withdrawal' is used for withdrawals approved from now on; older
+      // withdrawals were written as 'adjustment' and stay readable as such.
+      enum: ['ride_earning', 'commission_deduction', 'top_up', 'adjustment', 'subscription_purchase', 'withdrawal'],
       required: true,
       index: true,
     },
@@ -54,6 +57,8 @@ const walletTransactionSchema = new mongoose.Schema(
 );
 
 walletTransactionSchema.index({ driverId: 1, createdAt: -1 });
+/// Mirrors every driver wallet movement into the unified ledger.
+walletTransactionSchema.plugin(driverWalletTransactionLedgerPlugin);
 
 export const WalletTransaction =
   mongoose.models.WalletTransaction || mongoose.model('WalletTransaction', walletTransactionSchema);

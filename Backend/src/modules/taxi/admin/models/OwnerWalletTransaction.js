@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { ownerWalletTransactionLedgerPlugin } from '../../payments/plugins/walletLedgerPlugins.js';
 
 const ownerWalletTransactionSchema = new mongoose.Schema(
   {
@@ -28,5 +29,8 @@ const ownerWalletTransactionSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+/// Mirrors every owner wallet movement into the unified ledger.
+ownerWalletTransactionSchema.plugin(ownerWalletTransactionLedgerPlugin);
 
 export const OwnerWalletTransaction = mongoose.model('TaxiOwnerWalletTransaction', ownerWalletTransactionSchema);

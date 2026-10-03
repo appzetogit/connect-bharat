@@ -8,6 +8,7 @@ import { Driver } from '../driver/models/Driver.js';
 import { Vehicle } from '../admin/models/Vehicle.js';
 import { WalletTransaction } from '../driver/models/WalletTransaction.js';
 import { applyDriverWalletAdjustment } from '../driver/services/walletService.js';
+import { refundRideOnCancel } from '../payments/services/refundService.js';
 import { matchDrivers } from './matchingService.js';
 import {
   RIDE_LIVE_STATUS,
@@ -971,6 +972,7 @@ export const cancelRideByAdmin = async (rideId) => {
     ride.biddingStatus = 'cancelled';
   }
   await ride.save();
+  void refundRideOnCancel({ ride, reason: 'Ride cancelled by admin' }); // never throws; queued unless payments.auto_refund_enabled
 
   if (ride.deliveryId) {
     await Delivery.findByIdAndUpdate(ride.deliveryId, {

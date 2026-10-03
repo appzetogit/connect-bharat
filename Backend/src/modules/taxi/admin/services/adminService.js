@@ -73,6 +73,7 @@ import { getRedisStatus } from '../../../../infrastructure/redis/redisClient.js'
 import { buildRentalTrackingSnapshot, listActiveRentalTrackingBookings } from '../../services/rentalTrackingService.js';
 import { sendEmail } from '../../services/mailService.js';
 import { getActivePaymentGateway, normalizePaymentSettingsPayload } from '../../services/paymentGatewayService.js';
+import { resolveApprovedWithdrawalStatus, startWithdrawalPayoutSafely } from '../../payments/services/payoutService.js';
 import { signAccessToken } from '../../services/tokenService.js';
 import { getActivePriceHikeMultiplier } from '../../services/priceHikeService.js';
 import { getBidRideSettings } from '../../services/transportSettingsService.js';
@@ -4812,7 +4813,7 @@ export const approveDriverWithdrawalRequest = async (requestId, adminId = null) 
     const walletResult = await applyDriverWalletAdjustment({
       driverId: driver._id,
       amount: -requestAmount,
-      type: 'adjustment',
+      type: 'withdrawal',
       description: 'Driver withdrawal approved by admin',
       metadata: {
         withdrawalRequestId: String(request._id),
@@ -4822,10 +4823,11 @@ export const approveDriverWithdrawalRequest = async (requestId, adminId = null) 
       session,
     });
 
-    request.status = 'completed';
+    request.status = await resolveApprovedWithdrawalStatus(); // 'completed', or 'processing' with payments.payout_mode=razorpayx
     await request.save({ session });
 
     await session.commitTransaction();
+    const payout = await startWithdrawalPayoutSafely({ request, account: { type: 'driver', id: String(driver._id) } });
 
     emitToDriver(driver._id, 'driver:wallet:updated', {
       wallet: walletResult.wallet,
@@ -4838,11 +4840,12 @@ export const approveDriverWithdrawalRequest = async (requestId, adminId = null) 
         driver_id: request.driver_id,
         amount: requestAmount,
         payment_method: request.payment_method || '',
-        status: request.status,
+        status: payout?.status === 'processed' ? 'completed' : payout && ['failed', 'reversed', 'rejected', 'cancelled'].includes(payout.status) ? 'failed' : request.status,
         createdAt: request.createdAt,
         updatedAt: request.updatedAt,
       },
       wallet: walletResult.wallet,
+      payout: payout ? { status: payout.status, payoutId: payout.payoutId || '', failureReason: payout.failureReason || '' } : null,
     };
   } catch (error) {
     await session.abortTransaction();

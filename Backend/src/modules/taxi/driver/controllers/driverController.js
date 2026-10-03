@@ -74,6 +74,7 @@ import {
   updateRentalVehicleType,
 } from "../../admin/services/adminService.js";
 import { resolveConfiguredGatewayCredentials } from "../../services/paymentGatewayService.js";
+import { creditDriverWalletFromGateway, rememberPaymentOrder } from "../../payments/services/paymentSettlementService.js";
 import { assignPushTokenToEntity } from "../../services/pushTokenService.js";
 import {
   completeDriverOnboarding,
@@ -6947,46 +6948,24 @@ const verifyAndApplyDriverRazorpayWalletTopup = async ({
   }
 
   const amount = Math.round(amountPaise) / 100;
-  const alreadyCredited = await WalletTransaction.findOne({
-    driverId: effectiveDriverId,
-    "metadata.providerPaymentId": normalizedPaymentId,
-  })
-    .select("_id")
-    .lean();
 
-  if (alreadyCredited) {
-    const driver = await Driver.findById(effectiveDriverId);
-    return {
-      driverId: effectiveDriverId,
-      wallet: driver ? await serializeDriverWallet(driver) : null,
-      transaction: null,
-      alreadyCredited: true,
-    };
-  }
-
-  const result = await topUpDriverWallet({
+  // Shared with the Razorpay webhook: credits once, whichever arrives first,
+  // and emits driver:wallet:updated when it does.
+  const credit = await creditDriverWalletFromGateway({
     driverId: effectiveDriverId,
     amount,
-    metadata: {
-      source: "razorpay",
-      provider: "razorpay",
-      providerOrderId: effectiveOrderId,
-      providerPaymentId: normalizedPaymentId,
-      providerPaymentLinkId: normalizedPaymentLinkId,
-    },
+    provider: "razorpay",
+    orderId: effectiveOrderId,
+    paymentId: normalizedPaymentId,
+    paymentLinkId: normalizedPaymentLinkId,
+    settledVia: "client_verify",
   });
-
-  const payload = {
-    wallet: result.wallet,
-    transaction: result.transaction,
-  };
-
-  emitToDriver(effectiveDriverId, "driver:wallet:updated", payload);
 
   return {
     driverId: effectiveDriverId,
-    ...payload,
-    alreadyCredited: false,
+    wallet: credit.wallet,
+    transaction: credit.transaction,
+    alreadyCredited: credit.status === "existing",
   };
 };
 
@@ -7126,6 +7105,8 @@ export const createDriverPhonePeWalletTopupOrder = async (req, res) => {
     response: summarizePhonePePayload(payload || {}),
   });
 
+  await rememberPaymentOrder({ provider: "phonepe", orderId: merchantTransactionId, purpose: "driver_wallet_topup", owner: { type: "driver", id: driverId }, amount }); // lets the PhonePe webhook find the driver
+
   res.status(201).json({
     success: true,
     data: {
@@ -7202,29 +7183,18 @@ export const verifyDriverPhonePeWalletTopup = async (req, res) => {
   });
 
   if (paymentState === "COMPLETED") {
-    const alreadyCredited = await WalletTransaction.findOne({
+    // Shared with the PhonePe webhook: credits once, whichever arrives first.
+    const credit = await creditDriverWalletFromGateway({
       driverId,
-      $or: [
-        { "metadata.providerPaymentId": paymentId },
-        { "metadata.providerOrderId": merchantTransactionId },
-      ],
-    })
-      .select("_id")
-      .lean();
-
-    let result = null;
-    if (!alreadyCredited) {
-      result = await topUpDriverWallet({
-        driverId,
-        amount,
-        metadata: {
-          source: "phonepe",
-          provider: "phonepe",
-          providerOrderId: merchantTransactionId,
-          providerPaymentId: paymentId,
-        },
-      });
-    }
+      amount,
+      provider: "phonepe",
+      orderId: merchantTransactionId,
+      paymentId,
+      settledVia: "client_verify",
+      emit: false,
+    });
+    const alreadyCredited = credit.status === "existing";
+    const result = credit.status === "settled" ? credit : null;
 
     const driver = await Driver.findById(driverId);
     logPaymentDiagnostic({

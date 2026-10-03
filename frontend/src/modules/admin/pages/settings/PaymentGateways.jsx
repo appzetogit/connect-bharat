@@ -105,7 +105,8 @@ const PaymentGateways = () => {
         { label: 'Test Api Key', key: 'razor_pay.test_api_key' },
         { label: 'Test Secret Key', key: 'razor_pay.test_secret_key' },
         { label: 'Live Api Key', key: 'razor_pay.live_api_key' },
-        { label: 'Live Secret Key', key: 'razor_pay.live_secret_key' }
+        { label: 'Live Secret Key', key: 'razor_pay.live_secret_key' },
+        { label: 'Webhook Secret', key: 'razor_pay.webhook_secret' }
       ]
     },
     { 
@@ -118,7 +119,9 @@ const PaymentGateways = () => {
         { label: 'Environment', key: 'phone_pay.environment', type: 'select', options: ['test', 'production'] },
         { label: 'Client ID / Merchant ID', key: 'phone_pay.merchant_id' },
         { label: 'Client Secret / Salt Key', key: 'phone_pay.salt_key' },
-        { label: 'Client Version / Salt Index', key: 'phone_pay.salt_index' }
+        { label: 'Client Version / Salt Index', key: 'phone_pay.salt_index' },
+        { label: 'Webhook Username', key: 'phone_pay.webhook_username' },
+        { label: 'Webhook Password', key: 'phone_pay.webhook_password' }
       ]
     },
     { 
