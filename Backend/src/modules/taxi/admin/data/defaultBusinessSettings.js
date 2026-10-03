@@ -197,4 +197,20 @@ export const createDefaultBusinessSettings = () => ({
     cycle_start_hour: '6',
     cycle_timezone: 'Asia/Kolkata',
   },
+  // Payments (refunds, payouts). Everything here defaults to today's
+  // behaviour: refunds wait for an admin, withdrawals are paid by hand.
+  payments: {
+    // '1' sends refunds to the gateway/wallet as soon as a cancel owes one;
+    // '0' records the refund as `requested` for an admin to approve.
+    auto_refund_enabled: '0',
+    // 'manual' - admin pays the driver outside the app (as before);
+    // 'razorpayx' - approving a withdrawal sends a RazorpayX payout.
+    payout_mode: 'manual',
+    // IMPS | NEFT | RTGS | UPI. UPI is used automatically for UPI-only
+    // payees.
+    payout_transfer_mode: 'IMPS',
+    // RazorpayX current account number payouts are debited from. Falls back
+    // to env RAZORPAYX_ACCOUNT_NUMBER.
+    razorpayx_account_number: '',
+  },
 });

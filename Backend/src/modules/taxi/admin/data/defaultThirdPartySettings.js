@@ -71,6 +71,9 @@ export const createDefaultThirdPartySettings = () => {
         test_secret_key: 'rzp_test_demo_secret',
         live_api_key: '',
         live_secret_key: '',
+        // Secret set on the webhook in the Razorpay dashboard. Falls back to
+        // env RAZORPAY_WEBHOOK_SECRET.
+        webhook_secret: '',
       },
       phone_pay: {
         enabled: '0',
@@ -78,6 +81,10 @@ export const createDefaultThirdPartySettings = () => {
         merchant_id: '',
         salt_key: '',
         salt_index: '1',
+        // Username/password set on the webhook in the PhonePe dashboard. Fall
+        // back to env PHONEPE_WEBHOOK_USERNAME / PHONEPE_WEBHOOK_PASSWORD.
+        webhook_username: '',
+        webhook_password: '',
       },
       stripe: {
         enabled: '0',

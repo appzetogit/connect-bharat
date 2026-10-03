@@ -99,6 +99,18 @@ export const adminService = {
 
   adjustOwnerWallet: (id, data) => api.post(`/admin/wallet/owners/${id}/adjust`, data),
   getOwnerWalletHistory: (id) => api.get(`/admin/wallet/owners/${id}/history`),
+  approveOwnerWithdrawalRequest: (requestId) => api.patch(`/admin/wallet/owners/withdrawals/${requestId}/approve`),
+  rejectOwnerWithdrawalRequest: (requestId) => api.patch(`/admin/wallet/owners/withdrawals/${requestId}/reject`),
+
+  // Payments: refunds, ledger, reports (Backend payments module)
+  getPaymentRefunds: (params = {}) => api.get('/admin/payments/refunds', { params }),
+  createPaymentRefund: (data) => api.post('/admin/payments/refunds', data),
+  approvePaymentRefund: (id) => api.post(`/admin/payments/refunds/${id}/approve`),
+  rejectPaymentRefund: (id, reason) => api.post(`/admin/payments/refunds/${id}/reject`, { reason }),
+  getPaymentLedger: (params = {}) => api.get('/admin/payments/ledger', { params }),
+  getPaymentSummary: (params = {}) => api.get('/admin/payments/reports/summary', { params }),
+  getPaymentSettings: () => api.get('/admin/payments/settings'),
+  updatePaymentSettings: (data) => api.patch('/admin/payments/settings', data),
 
   getReferralDashboard: () => api.get('/admin/referral/dashboard'),
 

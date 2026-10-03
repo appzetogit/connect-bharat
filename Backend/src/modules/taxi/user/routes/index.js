@@ -7,6 +7,7 @@ import { userRouter } from './userRoutes.js';
 import { userExtrasRouter } from './userExtrasRoutes.js';
 import { tripSecurityRouter } from './tripSecurityRoutes.js';
 import { rentalUserRouter } from '../../rental/routes.js';
+import { userPaymentRouter } from '../../payments/routes/userPaymentRoutes.js';
 import { getUserHomeManagement } from '../../admin/controllers/adminController.js';
 import { asyncHandler } from '../../../../utils/asyncHandler.js';
 
@@ -20,6 +21,7 @@ userModuleRouter.use(userExtrasRouter);
 userModuleRouter.use('/users', userRouter);
 userModuleRouter.use('/rides', fareEstimateRouter);
 userModuleRouter.use('/users', rentalUserRouter);
+userModuleRouter.use('/users', userPaymentRouter);
 userModuleRouter.use('/rides', rideRouter);
 userModuleRouter.use('/deliveries', deliveryRouter);
 userModuleRouter.use('/promos', promoRouter);

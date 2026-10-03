@@ -935,6 +935,14 @@ const AdminLayout = () => {
           },
           { icon: Wallet, label: 'Wallet Payment', path: '/admin/wallet/payment', permission: 'wallet.view' },
           {
+            icon: IndianRupee,
+            label: 'Payments',
+            subItems: [
+              { label: 'Refunds', path: '/admin/finance/refunds', permission: 'wallet.view' },
+              { label: 'Ledger', path: '/admin/finance/ledger', permission: 'wallet.view' },
+            ],
+          },
+          {
             icon: Car,
             label: 'Driver Management',
             subItems: [

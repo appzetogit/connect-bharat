@@ -235,3 +235,29 @@ export const resolveConfiguredGatewayCredentials = async (gatewayKey) => {
 
   return { ...validatedGateway, environment };
 };
+
+/// Webhook verification secrets for a gateway.
+///
+/// Read even when the gateway is disabled: a webhook for a payment taken
+/// before an admin switched gateways must still be verified and settled.
+/// Admin settings win; env vars are the fallback so the secret can be kept
+/// out of the database.
+export const resolveGatewayWebhookCredentials = async (gatewayKey) => {
+  const settings = await ensureThirdPartySettings();
+  const gateway = normalizeGatewayConfig(gatewayKey, settings?.payment?.[gatewayKey] || {});
+
+  if (gatewayKey === 'razor_pay') {
+    return {
+      webhookSecret: normalizeString(gateway.webhook_secret) || normalizeString(process.env.RAZORPAY_WEBHOOK_SECRET),
+    };
+  }
+
+  if (gatewayKey === 'phone_pay') {
+    return {
+      username: normalizeString(gateway.webhook_username) || normalizeString(process.env.PHONEPE_WEBHOOK_USERNAME),
+      password: normalizeString(gateway.webhook_password) || normalizeString(process.env.PHONEPE_WEBHOOK_PASSWORD),
+    };
+  }
+
+  return {};
+};

@@ -5,6 +5,7 @@ import { PoolingSeatReservation } from '../models/PoolingSeatReservation.js';
 import { ApiError } from '../../../../utils/ApiError.js';
 import { asyncHandler } from '../../../../utils/asyncHandler.js';
 import { uploadDataUrl } from '../../../../utils/fileUpload.js';
+import { refundPoolingBookingOnCancel } from '../../payments/services/refundService.js';
 
 const ok = (res, data, message) => res.status(200).json({ success: true, data, message });
 const created = (res, data, message) => res.status(201).json({ success: true, data, message });
@@ -193,6 +194,7 @@ export const updatePoolingBookingStatus = asyncHandler(async (req, res) => {
   if (['cancelled', 'no_show'].includes(String(status || '').toLowerCase())) {
     await PoolingSeatReservation.deleteMany({ booking: booking._id });
   }
+  if (String(status || '').toLowerCase() === 'cancelled') void refundPoolingBookingOnCancel({ booking, initiatedBy: { type: 'admin', id: String(req.auth?.sub || '') } });
 
   return ok(res, booking, 'Booking status updated successfully');
 });

@@ -8,6 +8,7 @@ import { BusBooking } from '../../user/models/BusBooking.js';
 import { BusService } from '../models/BusService.js';
 import { BusSeatHold } from '../../user/models/BusSeatHold.js';
 import { getPublicActivePaymentGateway } from '../../services/paymentGatewayService.js';
+import { refundBusSeatsOnAdminCancel } from '../../payments/services/refundService.js';
 import { getOrLoadCachedValue, invalidateCachedPrefix, invalidateCachedValue } from '../../../../utils/cache.js';
 import { getMailConfigStatus, sendEmail } from '../../services/mailService.js';
 // Used ~40 times below but never imported: those paths threw ReferenceError
@@ -1322,6 +1323,7 @@ export const cancelAdminBusBookingSeats = asyncHandler(async (req, res) => {
     booking.notes = [booking.notes, adminNote].filter(Boolean).join(' | ');
   }
   await booking.save();
+  await refundBusSeatsOnAdminCancel({ booking, seatIds: seatsToCancel.map((item) => item.seatId), reason: adminNote, initiatedBy: { type: 'admin', id: String(req.auth?.sub || '') } });
 
   await BusSeatHold.deleteMany({
     bookingId: booking._id,

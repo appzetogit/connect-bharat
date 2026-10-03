@@ -4,6 +4,7 @@ import { env } from '../../../../config/env.js';
 import { getReferralSettings, getReferralTranslationContent } from '../../admin/services/adminService.js';
 import { getPublicActivePaymentGateway } from '../../services/paymentGatewayService.js';
 import { buildPaymentRequestContext, logPaymentDiagnostic } from '../../services/paymentDiagnostics.js';
+import { handlePhonePeWebhook } from '../../payments/services/webhookService.js';
 
 /**
  * Common controller for shared utilities like file uploads
@@ -70,10 +71,24 @@ export const acknowledgePhonePeCallback = asyncHandler(async (req, res) => {
         body: req.body || {},
     });
 
-    return res.json({
-        success: true,
-        message: 'Callback received',
-    });
+    /// This used to only log, so a payment completed after the app was
+    /// killed was never credited. It now verifies the callback the PhonePe v2
+    /// way (Authorization = SHA256(username:password)) and settles through
+    /// the same order-status check the /wallet/phonepe/status/:id endpoints
+    /// use. Until webhook credentials are configured it keeps the old
+    /// log-and-acknowledge behaviour.
+    try {
+        const result = await handlePhonePeWebhook({
+            authorization: req.get('authorization') || '',
+            body: req.body || {},
+        });
+        return res.json({ success: true, message: 'Callback processed', data: result });
+    } catch (error) {
+        if (error?.statusCode === 503) {
+            return res.json({ success: true, message: 'Callback received' });
+        }
+        throw error;
+    }
 });
 
 export const acknowledgeRechargeApiCallback = asyncHandler(async (req, res) => {

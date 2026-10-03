@@ -14,6 +14,7 @@ import { comparePassword, hashPassword, signAccessToken } from '../services/auth
 import { env } from '../../../../config/env.js';
 import { uploadDataUrl } from '../../../../utils/fileUpload.js';
 import { resolveConfiguredGatewayCredentials } from '../../services/paymentGatewayService.js';
+import { creditUserWalletFromGateway, rememberPaymentOrder } from '../../payments/services/paymentSettlementService.js';
 import { getTransportRideSettings } from '../../services/transportSettingsService.js';
 import {
   consumeUserSignupSession,
@@ -2389,33 +2390,15 @@ const verifyAndApplyUserRazorpayWalletTopup = async ({
 
   const amount = Math.round(amountPaise) / 100;
 
-  await ensureUserWallet(effectiveUserId);
-
-  const alreadyCredited = await UserWallet.findOne({
+  // Shared with the Razorpay webhook: credits once, whichever arrives first.
+  await creditUserWalletFromGateway({
     userId: effectiveUserId,
-    'transactions.providerPaymentId': normalizedPaymentId,
-  })
-    .select('_id')
-    .lean();
-
-  if (!alreadyCredited) {
-    const tx = {
-      kind: 'credit',
-      amount,
-      title: 'Wallet Refilled',
-      provider: 'razorpay',
-      providerOrderId: normalizedOrderId,
-      providerPaymentId: normalizedPaymentId,
-    };
-
-    await UserWallet.updateOne(
-      { userId: effectiveUserId },
-      {
-        $inc: { balance: amount },
-        $push: { transactions: { $each: [tx], $slice: -50 } },
-      },
-    );
-  }
+    amount,
+    provider: 'razorpay',
+    orderId: normalizedOrderId,
+    paymentId: normalizedPaymentId,
+    settledVia: 'client_verify',
+  });
 
   const wallet = await UserWallet.findOne({ userId: effectiveUserId })
     .select('balance refundWallet transactions')
@@ -2645,6 +2628,8 @@ export const createPhonePeWalletTopupOrder = async (req, res) => {
     response: summarizePhonePePayload(payload || {}),
   });
 
+  await rememberPaymentOrder({ provider: 'phonepe', orderId: merchantTransactionId, purpose: 'user_wallet_topup', owner: { type: 'user', id: userId }, amount }); // lets the PhonePe webhook find the user
+
   res.status(201).json({
     success: true,
     data: {
@@ -2822,36 +2807,16 @@ export const verifyPhonePeWalletTopup = async (req, res) => {
   });
 
   if (paymentState === 'COMPLETED') {
-    await ensureUserWallet(userId);
-
-    const alreadyCredited = await UserWallet.findOne({
+    // Shared with the PhonePe webhook: credits once, whichever arrives first.
+    const credit = await creditUserWalletFromGateway({
       userId,
-      $or: [
-        { 'transactions.providerPaymentId': paymentId },
-        { 'transactions.providerOrderId': merchantTransactionId },
-      ],
-    })
-      .select('_id')
-      .lean();
-
-    if (!alreadyCredited) {
-      const tx = {
-        kind: 'credit',
-        amount,
-        title: 'Wallet Refilled',
-        provider: 'phonepe',
-        providerOrderId: merchantTransactionId,
-        providerPaymentId: paymentId,
-      };
-
-      await UserWallet.updateOne(
-        { userId },
-        {
-          $inc: { balance: amount },
-          $push: { transactions: { $each: [tx], $slice: -50 } },
-        },
-      );
-    }
+      amount,
+      provider: 'phonepe',
+      orderId: merchantTransactionId,
+      paymentId,
+      settledVia: 'client_verify',
+    });
+    const alreadyCredited = credit.status === 'existing';
 
     const wallet = await UserWallet.findOne({ userId })
       .select('balance refundWallet transactions')

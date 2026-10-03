@@ -37,6 +37,7 @@ import { getBidRideSettings, getTransportRideSettings } from '../../services/tra
 import { matchDrivers } from '../../services/matchingService.js';
 import { Ride } from '../models/Ride.js';
 import { advancePaidAmount } from '../../outstation/services/outstationFare.js';
+import { findWebhookSettledRidePayment, recordFeedbackForSettledRidePayment } from '../../payments/services/paymentSettlementService.js';
 import { UserWallet } from '../models/UserWallet.js';
 
 const EARTH_RADIUS_METERS = 6371000;
@@ -621,6 +622,13 @@ export const verifyRazorpayRideCompletion = async (req, res) => {
     throw new ApiError(400, 'Invalid payment signature');
   }
 
+  // App was killed after paying and the webhook settled it: only the feedback is left.
+  const webhookSettled = await findWebhookSettledRidePayment({ orderId, paymentId });
+  if (webhookSettled) {
+    await recordFeedbackForSettledRidePayment({ rideId, userId: req.auth.sub, rating, comment, settledOrder: webhookSettled });
+    return res.json({ success: true, data: await getRideDetails(rideId) });
+  }
+
   const order = await razorpayRequest({
     method: 'GET',
     path: `/orders/${encodeURIComponent(orderId)}`,
@@ -929,6 +937,13 @@ export const verifyRazorpayRideTip = async (req, res) => {
 
   if (expectedSignature !== signature) {
     throw new ApiError(400, 'Invalid payment signature');
+  }
+
+  // App was killed after paying and the webhook settled it: only the feedback is left.
+  const webhookSettled = await findWebhookSettledRidePayment({ orderId, paymentId });
+  if (webhookSettled) {
+    await recordFeedbackForSettledRidePayment({ rideId, userId: req.auth.sub, rating, comment, settledOrder: webhookSettled });
+    return res.json({ success: true, data: await getRideDetails(rideId) });
   }
 
   const order = await razorpayRequest({

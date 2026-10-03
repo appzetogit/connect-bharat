@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 
 import AdminPageHeader from '../../components/ui/AdminPageHeader';
 import { adminCardClass, adminInputClass } from '../../components/ui/adminUi';
+import { adminService } from '../../services/adminService';
 
 const statusPillClass = (status) => {
   const normalized = String(status || '').toLowerCase();
@@ -24,6 +25,24 @@ const WithdrawalRequestOwnerDetail = () => {
   const [owner, setOwner] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [query, setQuery] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+  const [busyId, setBusyId] = useState('');
+
+  // Approve debits the owner wallet (and sends a RazorpayX payout when
+  // payments.payout_mode is razorpayx); reject just closes the request.
+  const handleWithdrawalAction = async (requestId, action) => {
+    if (!window.confirm(action === 'approve' ? 'Approve this withdrawal and debit the owner wallet?' : 'Reject this withdrawal request?')) return;
+    setBusyId(requestId);
+    try {
+      if (action === 'approve') await adminService.approveOwnerWithdrawalRequest(requestId);
+      else await adminService.rejectOwnerWithdrawalRequest(requestId);
+      setReloadKey((value) => value + 1);
+    } catch (actionError) {
+      window.alert(actionError?.message || 'Action failed');
+    } finally {
+      setBusyId('');
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -69,7 +88,7 @@ const WithdrawalRequestOwnerDetail = () => {
     };
 
     fetchData();
-  }, [id, itemsPerPage]);
+  }, [id, itemsPerPage, reloadKey]);
 
   const filteredHistory = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -221,6 +240,26 @@ const WithdrawalRequestOwnerDetail = () => {
                           >
                             {tx.status}
                           </span>
+                          {String(tx.status).toLowerCase() === 'pending' ? (
+                            <div className="mt-2 flex justify-end gap-2">
+                              <button
+                                type="button"
+                                disabled={busyId === tx.id}
+                                onClick={() => handleWithdrawalAction(tx.id, 'approve')}
+                                className="rounded bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busyId === tx.id}
+                                onClick={() => handleWithdrawalAction(tx.id, 'reject')}
+                                className="rounded bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          ) : null}
                         </td>
                       </tr>
                     ))

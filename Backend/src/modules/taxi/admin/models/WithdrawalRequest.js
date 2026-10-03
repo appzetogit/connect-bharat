@@ -43,7 +43,18 @@ const withdrawalRequestSchema = new mongoose.Schema({
       default: null,
     },
   },
-  status: { type: String, enum: ['pending', 'completed', 'cancelled'], default: 'pending' }
+  // processing/failed only occur with payments.payout_mode = 'razorpayx':
+  // processing while the bank payout is in flight, failed when it bounced
+  // (the amount is then back in the wallet).
+  status: { type: String, enum: ['pending', 'processing', 'completed', 'failed', 'cancelled'], default: 'pending' },
+  payout: {
+    provider: { type: String, default: '' },
+    payoutId: { type: String, default: '' },
+    status: { type: String, default: '' },
+    utr: { type: String, default: '' },
+    failureReason: { type: String, default: '' },
+    processedAt: { type: Date, default: null },
+  },
 }, { timestamps: true });
 
 export const WithdrawalRequest = mongoose.models.TaxiWithdrawalRequest || mongoose.model('TaxiWithdrawalRequest', withdrawalRequestSchema);

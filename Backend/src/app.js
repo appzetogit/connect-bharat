@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { env } from './config/env.js';
 import { errorHandler, notFoundHandler } from './modules/taxi/middlewares/errorMiddleware.js';
 import { taxiRouter } from './modules/taxi/routes/index.js';
+import { webhookRouter } from './modules/taxi/payments/routes/webhookRoutes.js';
 
 export const createApp = () => {
   const app = express();
@@ -17,6 +18,9 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
+  // Gateway webhooks need the raw body for signature checks, so they are
+  // mounted before the JSON parser below.
+  app.use(['/api/v1/webhooks', '/api/webhooks'], webhookRouter);
   app.use(express.json({ limit: '25mb' }));
   app.use(express.urlencoded({ extended: true })); 
   app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
