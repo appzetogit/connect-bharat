@@ -40,6 +40,7 @@ import { advancePaidAmount } from '../../outstation/services/outstationFare.js';
 import { findWebhookSettledRidePayment, recordFeedbackForSettledRidePayment } from '../../payments/services/paymentSettlementService.js';
 import { UserWallet } from '../models/UserWallet.js';
 import { corporateEmployeeAmountDue, markCorporateEmployeeSharePaid } from '../../corporate/services/corporateCompletionService.js';
+import { abortTransaction, beginTransaction, commitTransaction } from '../../../../utils/transaction.js';
 
 const EARTH_RADIUS_METERS = 6371000;
 const AVERAGE_CITY_SPEED_KMPH = 24;
@@ -671,7 +672,7 @@ export const verifyRazorpayRideCompletion = async (req, res) => {
   const session = await mongoose.startSession();
 
   try {
-    session.startTransaction();
+    beginTransaction(session);
 
     const liveRide = await loadCompletedRideForUser(rideId, req.auth.sub, session);
     const result = await finalizeRideCompletion({
@@ -694,7 +695,7 @@ export const verifyRazorpayRideCompletion = async (req, res) => {
       session,
     });
 
-    await session.commitTransaction();
+    await commitTransaction(session);
 
     if (result.walletResult?.transaction) {
       emitToDriver(liveRide.driverId, 'driver:wallet:updated', {
@@ -714,7 +715,7 @@ export const verifyRazorpayRideCompletion = async (req, res) => {
       data: result.ride,
     });
   } catch (error) {
-    await session.abortTransaction();
+    await abortTransaction(session);
     throw error;
   } finally {
     session.endSession();
@@ -733,7 +734,7 @@ export const payRideCompletionWithWallet = async (req, res) => {
   const session = await mongoose.startSession();
 
   try {
-    session.startTransaction();
+    beginTransaction(session);
 
     const ride = await loadCompletedRideForUser(rideId, req.auth.sub, session);
     const paymentAmounts = buildCompletionAmounts(ride, tipAmount);
@@ -784,7 +785,7 @@ export const payRideCompletionWithWallet = async (req, res) => {
       session,
     });
 
-    await session.commitTransaction();
+    await commitTransaction(session);
 
     if (result.walletResult?.transaction) {
       emitToDriver(ride.driverId, 'driver:wallet:updated', {
@@ -804,7 +805,7 @@ export const payRideCompletionWithWallet = async (req, res) => {
       data: result.ride,
     });
   } catch (error) {
-    await session.abortTransaction();
+    await abortTransaction(session);
     throw error;
   } finally {
     session.endSession();

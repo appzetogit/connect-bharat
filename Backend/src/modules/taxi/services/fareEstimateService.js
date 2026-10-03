@@ -12,6 +12,8 @@ import {
   resolveSetPriceForRide,
 } from './rideService.js';
 import { buildCorporateEstimateQuote, loadCorporateEstimateContext } from '../corporate/services/corporatePricingService.js';
+import { resolveTariffRate, tariffAppliesTo } from '../corporate/services/corporateV2Rules.js';
+import { isFlagOn } from '../corporate/services/corporateSettingsService.js';
 
 /// Fare estimate before booking: `POST /rides/estimate`.
 ///
@@ -93,6 +95,29 @@ const listPricedVehicleIds = async ({ zoneId, serviceLocationId, transportType }
     $or: placeFilters,
   });
   return ids.map(String);
+};
+
+/// Vehicles a company tariff can price on its own, with no Set Price row in
+/// this zone: every vehicle with its own tariff row, and - when the tariff has
+/// a fallback rate - every active vehicle of this transport type. Without this
+/// a company priced entirely on its tariff got "no vehicles" in any city where
+/// the admin had not also set standard prices. Narrowed to the company's
+/// allowed vehicle types when it has a list.
+const listCorporateTariffVehicleIds = async (context, serviceType, transportType) => {
+  if (!context || context.error) return [];
+  const { corporate, settings } = context;
+  if (!tariffAppliesTo({ tariff: corporate?.tariff, serviceType, masterEnabled: isFlagOn(settings?.tariff_enabled) })) {
+    return [];
+  }
+  const rowIds = (corporate.tariff.byVehicleType || []).map((row) => String(row?.vehicleTypeId || '')).filter(Boolean);
+  const fallback = resolveTariffRate(corporate.tariff, null);
+  const hasFallback = fallback.baseFare > 0 || fallback.perKm > 0 || fallback.minimumFare > 0;
+  const fallbackIds = hasFallback
+    ? (await Vehicle.find({ transport_type: { $in: [transportType, 'both'] }, active: { $ne: false } }).select('_id').lean()).map((row) => String(row._id))
+    : [];
+  const allowed = (corporate.allowedVehicleTypeIds || []).map(String);
+  const all = [...new Set([...rowIds, ...fallbackIds])];
+  return allowed.length ? all.filter((id) => allowed.includes(id)) : all;
 };
 
 /// The vehicles of an intercity package: the package's own price list decides
@@ -220,6 +245,10 @@ export const estimateRideFares = async ({
     ? await loadPackageRow(intercity.packageId)
     : null;
 
+  const corporateContext = String(paymentMethod || '').trim().toLowerCase() === 'corporate'
+    ? await loadCorporateEstimateContext({ userId, corporateId, pickup: pickupCoords, drop: dropCoords, at })
+    : null;
+
   let ids = normalizeVehicleTypeIds(vehicleTypeIds, vehicleTypeId);
   if (ids.length === 0) {
     ids = packageRow
@@ -227,6 +256,9 @@ export const estimateRideFares = async ({
           .filter((row) => row?.vehicle_type && Number(row.active ?? 1) === 1)
           .map((row) => String(row.vehicle_type)))]
       : await listPricedVehicleIds({ zoneId: resolvedZoneId, serviceLocationId: resolvedServiceLocationId, transportType });
+    if (!packageRow) {
+      ids = [...new Set([...ids, ...(await listCorporateTariffVehicleIds(corporateContext, normalizedServiceType, transportType))])];
+    }
   }
   ids = ids.slice(0, MAX_VEHICLES_PER_ESTIMATE);
 
@@ -236,10 +268,6 @@ export const estimateRideFares = async ({
   const vehicleById = new Map(vehicles.map((vehicle) => [String(vehicle._id), vehicle]));
   const promoCode = typeof promo_code === 'string' ? promo_code.trim() : '';
   const promoServiceLocationId = service_location_id || resolvedServiceLocationId;
-
-  const corporateContext = String(paymentMethod || '').trim().toLowerCase() === 'corporate'
-    ? await loadCorporateEstimateContext({ userId, corporateId, pickup: pickupCoords, drop: dropCoords, at })
-    : null;
 
   const quotes = [];
   for (const id of ids) {

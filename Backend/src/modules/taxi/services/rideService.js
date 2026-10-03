@@ -36,6 +36,7 @@ import { settleCorporateRideAtCompletion } from '../corporate/services/corporate
 import { releaseRideAllowanceLater } from '../corporate/services/corporateAllowanceService.js';
 import { applyRideActualDistance } from './rideActualDistanceService.js';
 import { onParcelRideCompleted } from '../logistics/services/rideHooks.js';
+import { abortTransaction, beginTransaction, commitTransaction } from '../../../utils/transaction.js';
 
 const clearUserActiveRideIfPresent = async (user) => {
   if (!user?.currentRideId) {
@@ -1554,7 +1555,7 @@ export const createRideRecord = async ({
     const session = await mongoose.startSession();
 
     try {
-      session.startTransaction();
+      beginTransaction(session);
 
       const ride = await Ride.create(
         [
@@ -1616,13 +1617,13 @@ export const createRideRecord = async ({
         transport_type: transport_type || 'taxi',
       });
 
-      await session.commitTransaction();
+      await commitTransaction(session);
       await syncDeliveryWithRide(rideDoc);
       publishRideLifecycle('created', rideDoc);
       return rideDoc;
     } catch (error) {
       lastError = error;
-      await session.abortTransaction();
+      await abortTransaction(session);
 
       const isTransient =
         typeof error?.hasErrorLabel === 'function' &&
@@ -2564,7 +2565,7 @@ export const acceptRideBidAssignment = async ({ rideId, bidId, userId }) => {
     const session = await mongoose.startSession();
 
     try {
-      session.startTransaction();
+      beginTransaction(session);
 
       const ride = await Ride.findOne({
         _id: rideId,
@@ -2643,13 +2644,13 @@ export const acceptRideBidAssignment = async ({ rideId, bidId, userId }) => {
         { session },
       );
 
-      await session.commitTransaction();
+      await commitTransaction(session);
       await syncDeliveryWithRide(ride);
 
       return ride;
     } catch (error) {
       lastError = error;
-      await session.abortTransaction();
+      await abortTransaction(session);
 
       const isTransient =
         typeof error?.hasErrorLabel === 'function' &&

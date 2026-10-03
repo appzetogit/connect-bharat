@@ -101,6 +101,7 @@ import {
 } from './adminAccessService.js';
 import { assertDriverDocumentsReadyForApproval } from '../operations/driverDocumentReviewService.js';
 import { getDashboardPaymentStats } from '../operations/dashboardAnalyticsService.js';
+import { abortTransaction, beginTransaction, commitTransaction } from '../../../../utils/transaction.js';
 
 const PUBLIC_VEHICLE_CATALOG_CACHE_TTL_MS = 5 * 60 * 1000;
 let publicVehicleCatalogCache = {
@@ -4784,7 +4785,7 @@ export const approveDriverWithdrawalRequest = async (requestId, adminId = null) 
   const session = await mongoose.startSession();
 
   try {
-    session.startTransaction();
+    beginTransaction(session);
 
     const request = await WithdrawalRequest.findById(requestId).session(session);
     if (!request || !request.driver_id) {
@@ -4827,7 +4828,7 @@ export const approveDriverWithdrawalRequest = async (requestId, adminId = null) 
     request.status = await resolveApprovedWithdrawalStatus(); // 'completed', or 'processing' with payments.payout_mode=razorpayx
     await request.save({ session });
 
-    await session.commitTransaction();
+    await commitTransaction(session);
     const payout = await startWithdrawalPayoutSafely({ request, account: { type: 'driver', id: String(driver._id) } });
 
     emitToDriver(driver._id, 'driver:wallet:updated', {
@@ -4849,7 +4850,7 @@ export const approveDriverWithdrawalRequest = async (requestId, adminId = null) 
       payout: payout ? { status: payout.status, payoutId: payout.payoutId || '', failureReason: payout.failureReason || '' } : null,
     };
   } catch (error) {
-    await session.abortTransaction();
+    await abortTransaction(session);
     throw error;
   } finally {
     session.endSession();
@@ -6108,7 +6109,9 @@ const toAdminRideRow = (ride) => {
     tripStatus,
     rideStatus: ride.status,
     liveStatus: ride.liveStatus,
-    paymentOption: 'CASH',
+    // Was hardcoded to 'CASH', so online, wallet and company-billed rides all
+    // showed as cash on the Ongoing page.
+    paymentOption: String(ride.paymentMethod || 'cash').toUpperCase(),
     fare: Number(ride.fare || 0),
     // Prefer the human address the customer actually gave. Falling straight to
     // coordinates showed "12.9716, 77.5946" for website bookings, which carry a

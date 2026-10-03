@@ -57,6 +57,7 @@ import {
   summarizePhonePePayload,
   summarizePhonePeRequestBody,
 } from '../../services/paymentDiagnostics.js';
+import { abortTransaction, beginTransaction, commitTransaction } from '../../../../utils/transaction.js';
 
 const VALID_GENDERS = new Set(['male', 'female', 'other', 'prefer-not-to-say', '']);
 
@@ -2217,7 +2218,7 @@ export const transferUserWalletToDriver = async (req, res) => {
   const session = await mongoose.startSession();
 
   try {
-    session.startTransaction();
+    beginTransaction(session);
 
     const senderWallet = await UserWallet.findOne({ userId: senderId }).session(session);
     if (!senderWallet) {
@@ -2255,7 +2256,7 @@ export const transferUserWalletToDriver = async (req, res) => {
       session,
     });
 
-    await session.commitTransaction();
+    await commitTransaction(session);
 
     emitToDriver(recipientDriver._id, 'driver:wallet:updated', {
       wallet: walletUpdate.wallet,
@@ -2295,7 +2296,7 @@ export const transferUserWalletToDriver = async (req, res) => {
       },
     });
   } catch (error) {
-    await session.abortTransaction();
+    await abortTransaction(session);
     throw error;
   } finally {
     session.endSession();

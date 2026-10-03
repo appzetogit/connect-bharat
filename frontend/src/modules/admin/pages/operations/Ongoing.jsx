@@ -32,6 +32,7 @@ const PAYMENT_STYLES = {
   UPI: 'bg-indigo-50 text-indigo-600 border border-indigo-100',
   CARD: 'bg-purple-50 text-purple-600 border border-purple-100',
   WALLET: 'bg-teal-50 text-teal-600 border border-teal-100',
+  CORPORATE: 'bg-amber-50 text-amber-700 border border-amber-100',
 };
 
 const formatDate = (dateStr) => {

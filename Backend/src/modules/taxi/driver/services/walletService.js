@@ -15,6 +15,7 @@ import {
   getDriverVehicleClasses,
   resolveDriverSubscriptionSettings,
 } from './driverSubscriptionService.js';
+import { abortTransaction, beginTransaction, commitTransaction } from '../../../../utils/transaction.js';
 
 const normalizeAmount = (value, fieldName = 'amount') => {
   const amount = Number(value);
@@ -395,7 +396,7 @@ export const topUpDriverWallet = async ({ driverId, amount, metadata = {} }) => 
   const session = await mongoose.startSession();
 
   try {
-    session.startTransaction();
+    beginTransaction(session);
 
     const walletSettings = await getWalletSettings();
     if (!isEnabledSetting(walletSettings.show_wallet_feature_for_driver, true)) {
@@ -421,10 +422,10 @@ export const topUpDriverWallet = async ({ driverId, amount, metadata = {} }) => 
       session,
     });
 
-    await session.commitTransaction();
+    await commitTransaction(session);
     return result;
   } catch (error) {
-    await session.abortTransaction();
+    await abortTransaction(session);
     throw error;
   } finally {
     session.endSession();
@@ -435,7 +436,7 @@ export const settleCompletedRideWallet = async ({ rideId }) => {
   const session = await mongoose.startSession();
 
   try {
-    session.startTransaction();
+    beginTransaction(session);
 
     const ride = await Ride.findOneAndUpdate(
       { _id: rideId, walletSettledAt: null, driverId: { $ne: null } },
@@ -444,7 +445,7 @@ export const settleCompletedRideWallet = async ({ rideId }) => {
     );
 
     if (!ride) {
-      await session.commitTransaction();
+      await commitTransaction(session);
       return null;
     }
 
@@ -523,7 +524,7 @@ export const settleCompletedRideWallet = async ({ rideId }) => {
     }
 
     if (!amount) {
-      await session.commitTransaction();
+      await commitTransaction(session);
       return null;
     }
 
@@ -552,13 +553,13 @@ export const settleCompletedRideWallet = async ({ rideId }) => {
       session,
     });
 
-    await session.commitTransaction();
+    await commitTransaction(session);
     return {
       ...result,
       ride,
     };
   } catch (error) {
-    await session.abortTransaction();
+    await abortTransaction(session);
     throw error;
   } finally {
     session.endSession();
