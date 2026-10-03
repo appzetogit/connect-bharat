@@ -975,6 +975,15 @@ const AdminLayout = () => {
           },
           { icon: Briefcase, label: 'Owner Management', path: '/admin/owners/dashboard', permission: 'owners.view' },
           {
+            icon: Briefcase,
+            label: 'Corporate Accounts',
+            subItems: [
+              { label: 'Corporates', path: '/admin/corporates', permission: 'corporates.view' },
+              { label: 'Add Corporate', path: '/admin/corporates/create', permission: 'corporates.view' },
+              { label: 'Outstanding & Settings', path: '/admin/corporates/outstanding', permission: 'corporates.view' },
+            ],
+          },
+          {
             icon: FileText,
             label: 'Report',
             subItems: [

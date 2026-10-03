@@ -143,6 +143,7 @@ import {
   AdminZoneManagement,
   AdminUserAppManagement,
 } from './lazyPages';
+import { AdminCorporateCreate, AdminCorporateDetail, AdminCorporateList, AdminCorporateOutstanding } from './corporateAdminPages';
 
 const AdminReportPlaceholder = ({ title }) => (
   <div className="flex flex-col items-center justify-center min-h-[500px] text-gray-400 bg-white rounded-[32px] border border-gray-100 shadow-sm p-10 mx-6">
@@ -374,6 +375,10 @@ const adminRoutes = (
       <Route path="cms" element={<AdminCMSBuilder />} />
       <Route path="settings/cms/landing" element={<AdminLandingContent />} />
       <Route path="settings/cms/enquiries" element={<AdminWebsiteEnquiries />} />
+      <Route path="corporates" element={<AdminCorporateList />} />
+      <Route path="corporates/create" element={<AdminCorporateCreate />} />
+      <Route path="corporates/outstanding" element={<AdminCorporateOutstanding />} />
+      <Route path="corporates/:id" element={<AdminCorporateDetail />} />
       <Route path="settings/cms/header-footer" element={<AdminHeaderFooter />} />
       <Route path="support/ticket-title" element={<AdminSupportTicketTitle />} />
       <Route path="support/tickets" element={<AdminSupportTickets />} />

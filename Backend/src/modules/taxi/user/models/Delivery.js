@@ -84,7 +84,8 @@ const deliverySchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ['cash', 'online'],
+      // Mirrors Ride.paymentMethod, which a company-billed parcel copies here.
+      enum: ['cash', 'online', 'corporate'],
       default: 'cash',
       lowercase: true,
       trim: true,

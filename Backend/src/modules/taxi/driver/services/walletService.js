@@ -24,8 +24,11 @@ const normalizeAmount = (value, fieldName = 'amount') => {
   return Math.round(amount * 100) / 100;
 };
 
+// 'corporate' settles like 'online' (the driver collected nothing, so earnings
+// are credited) but is kept by name so settlement does not overwrite it.
 const normalizePaymentMethod = (value) => (
-  String(value || '').trim().toLowerCase() === 'cash' ? 'cash' : 'online'
+  String(value || '').trim().toLowerCase() === 'cash' ? 'cash'
+    : String(value || '').trim().toLowerCase() === 'corporate' ? 'corporate' : 'online'
 );
 
 const normalizeCommissionType = (value) => {

@@ -25,6 +25,8 @@ import { resolveRideRoute } from './routeService.js';
 import { computePackageFare, quoteFareForPricingRule } from './fareEngineService.js';
 import { getTransportRideSettings } from './transportSettingsService.js';
 import { findZoneByPickup } from './matchingService.js';
+import { attachCorporateBookingToRide, validateCorporateBooking } from '../corporate/services/corporateBookingService.js';
+import { recordCorporateRideCompletion } from '../corporate/services/corporateBillingService.js';
 
 const clearUserActiveRideIfPresent = async (user) => {
   if (!user?.currentRideId) {
@@ -84,7 +86,9 @@ export const clearDriverActiveRideIfStale = async (driverOrId) => {
 };
 
 const normalizeRidePaymentMethod = (paymentMethod) => (
-  !paymentMethod || String(paymentMethod).trim().toLowerCase() === 'cash' ? 'cash' : 'online'
+  !paymentMethod || String(paymentMethod).trim().toLowerCase() === 'cash' ? 'cash'
+    // Company-billed: kept as-is so createRideRecord can route it to the corporate checks.
+    : String(paymentMethod).trim().toLowerCase() === 'corporate' ? 'corporate' : 'online'
 );
 
 const normalizeServiceType = (serviceType) => {
@@ -1209,7 +1213,8 @@ export const createRideRecord = async ({
     vehicleTypeId: primaryVehicleTypeId,
   });
   const normalizedPaymentMethod = normalizeRidePaymentMethod(paymentMethod);
-  const resolvedRequestedPaymentMethod = allowedPaymentMethods.includes(normalizedPaymentMethod)
+  // Corporate billing is not a Set Price payment type; it is validated against the company below.
+  const resolvedRequestedPaymentMethod = normalizedPaymentMethod === 'corporate' ? 'corporate' : allowedPaymentMethods.includes(normalizedPaymentMethod)
     ? normalizedPaymentMethod
     : (allowedPaymentMethods[0] || 'cash');
   const requestedBookingMode = String(bookingMode || '').trim().toLowerCase();
@@ -1254,6 +1259,9 @@ export const createRideRecord = async ({
     intercity,
     vehicleTypeId: primaryVehicleTypeId,
   });
+
+  // Throws 403 when the company may not be billed (policy, limits, credit).
+  const corporateBooking = resolvedRequestedPaymentMethod === 'corporate' ? await validateCorporateBooking({ userId, serviceType: normalizedServiceType, vehicleTypeId: primaryVehicleTypeId, fare: safeFare, scheduledAt: normalizedScheduledAt }) : null;
 
   const bidRideSettings = await getBidRideSettings();
   const fareIncreaseWaitMinutes = toPositiveNumber(
@@ -1434,6 +1442,10 @@ export const createRideRecord = async ({
     throw new ApiError(400, 'Promo codes cannot be combined with subscription rides');
   }
 
+  if (corporateBooking && promoCode) {
+    throw new ApiError(400, 'Promo codes cannot be combined with corporate billing');
+  }
+
   if (!promoCode) {
     const ride = await Ride.create({
       userId,
@@ -1473,6 +1485,8 @@ export const createRideRecord = async ({
       status: RIDE_STATUS.SEARCHING,
       liveStatus: RIDE_LIVE_STATUS.SEARCHING,
     });
+
+    if (corporateBooking) await attachCorporateBookingToRide({ ride, booking: corporateBooking });
 
     user.currentRideId = ride._id;
     await user.save();
@@ -2137,7 +2151,8 @@ export const updateRideLifecycle = async ({ rideId, driverId, nextStatus, paymen
     ride.startedAt = new Date();
   }
 
-  if (paymentMethod !== undefined && paymentMethod !== null && String(paymentMethod).trim()) {
+  // A company-billed ride stays company-billed whatever the driver app sends.
+  if (paymentMethod !== undefined && paymentMethod !== null && String(paymentMethod).trim() && ride.paymentMethod !== 'corporate') {
     ride.paymentMethod = normalizeRidePaymentMethod(paymentMethod);
   }
 
@@ -2158,6 +2173,7 @@ export const updateRideLifecycle = async ({ rideId, driverId, nextStatus, paymen
     ]);
 
     walletUpdate = await settleCompletedRideWallet({ rideId: ride._id });
+    if (ride.paymentMethod === 'corporate') await recordCorporateRideCompletion({ rideId: ride._id });
     await consumeUserSubscriptionRide({ ride });
     const settledRide = await Ride.findById(ride._id).select('completedAt driverEarnings estimatedDistanceMeters');
 
