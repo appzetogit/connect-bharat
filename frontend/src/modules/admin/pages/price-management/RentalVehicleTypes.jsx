@@ -166,6 +166,8 @@ const createEmptyPricingRow = (id, label = 'Custom Package') => ({
   includedKm: '',
   extraHourPrice: '',
   extraKmPrice: '',
+  pricingUnit: 'hour',
+  extraDayPrice: '',
   active: true,
 });
 
@@ -178,8 +180,22 @@ const normalizePricing = (items = DEFAULT_PRICING) =>
     includedKm: normalizeNumberInput(item.includedKm),
     extraHourPrice: normalizeNumberInput(item.extraHourPrice),
     extraKmPrice: normalizeNumberInput(item.extraKmPrice),
+    pricingUnit: item.pricingUnit === 'day' ? 'day' : 'hour',
+    extraDayPrice: normalizeNumberInput(item.extraDayPrice),
     active: item.active !== false,
   }));
+
+const normalizeRentalExtras = (item = {}) => ({
+  driveModes: Array.isArray(item.driveModes) && item.driveModes.length ? item.driveModes : ['self_drive'],
+  withDriverSurcharge: {
+    amount: Number(item.withDriverSurcharge?.amount || 0),
+    unit: item.withDriverSurcharge?.unit || 'per_day',
+  },
+  securityDeposit: {
+    enabled: Boolean(item.securityDeposit?.enabled),
+    amount: Number(item.securityDeposit?.amount || 0),
+  },
+});
 
 const fileToDataUrl = (file) =>
   new Promise((resolve, reject) => {
@@ -231,6 +247,7 @@ const buildDefaultForm = () => {
     },
     blueprint: null,
     pricing: normalizePricing(),
+    ...normalizeRentalExtras(),
     active: true,
     status: 'active',
   };
@@ -374,6 +391,7 @@ const RentalVehicleTypes = ({ mode: propMode }) => {
               },
               blueprint: selected.blueprint?.lowerDeck?.length ? clone(selected.blueprint) : null,
               pricing: normalizePricing(selected.pricing),
+              ...normalizeRentalExtras(selected),
               active: selected.active !== false,
               status: selected.status || 'active',
             });
@@ -532,7 +550,7 @@ const RentalVehicleTypes = ({ mode: propMode }) => {
           ? {
               ...item,
               [field]:
-                ['durationHours', 'price', 'includedKm', 'extraHourPrice', 'extraKmPrice'].includes(field)
+                ['durationHours', 'price', 'includedKm', 'extraHourPrice', 'extraKmPrice', 'extraDayPrice'].includes(field)
                   ? normalizeNumberInput(value)
                   : value,
             }
@@ -554,6 +572,8 @@ const RentalVehicleTypes = ({ mode: propMode }) => {
           includedKm: '',
           extraHourPrice: '',
           extraKmPrice: '',
+          pricingUnit: 'hour',
+          extraDayPrice: '',
           active: true,
         },
       ],
@@ -591,7 +611,17 @@ const RentalVehicleTypes = ({ mode: propMode }) => {
           includedKm: toNumberOrZero(item.includedKm),
           extraHourPrice: toNumberOrZero(item.extraHourPrice),
           extraKmPrice: toNumberOrZero(item.extraKmPrice),
+          pricingUnit: item.pricingUnit === 'day' ? 'day' : 'hour',
+          extraDayPrice: toNumberOrZero(item.extraDayPrice),
         })),
+        withDriverSurcharge: {
+          amount: toNumberOrZero(formData.withDriverSurcharge?.amount),
+          unit: formData.withDriverSurcharge?.unit || 'per_day',
+        },
+        securityDeposit: {
+          enabled: Boolean(formData.securityDeposit?.enabled),
+          amount: toNumberOrZero(formData.securityDeposit?.amount),
+        },
       };
 
       if (!payload.name.trim()) {
@@ -1418,6 +1448,81 @@ const RentalVehicleTypes = ({ mode: propMode }) => {
                 </div>
               ) : null}
             </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <label className="text-sm font-bold text-slate-900">Drive Modes, Driver Surcharge and Security Deposit</label>
+              <p className="mt-1 text-xs text-slate-500">
+                Self-drive needs the rider's driving licence. With-driver adds the surcharge below. Both are also switched globally in Rental Operations &gt; Settings.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-4">
+                {[
+                  ['self_drive', 'Self drive'],
+                  ['with_driver', 'With driver'],
+                ].map(([mode, label]) => {
+                  const checked = (formData.driveModes || ['self_drive']).includes(mode);
+                  return (
+                    <label key={mode} className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          const current = formData.driveModes || ['self_drive'];
+                          const next = checked ? current.filter((item) => item !== mode) : [...current, mode];
+                          updateForm('driveModes', next.length ? next : ['self_drive']);
+                        }}
+                      />
+                      {label}
+                    </label>
+                  );
+                })}
+              </div>
+              {(formData.driveModes || []).includes('with_driver') ? (
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-500">Driver Surcharge (Rs)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.withDriverSurcharge?.amount ?? 0}
+                      onChange={(event) => updateForm('withDriverSurcharge', { ...formData.withDriverSurcharge, amount: event.target.value })}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-500">Charged</label>
+                    <select
+                      value={formData.withDriverSurcharge?.unit || 'per_day'}
+                      onChange={(event) => updateForm('withDriverSurcharge', { ...formData.withDriverSurcharge, unit: event.target.value })}
+                      className={inputClass}
+                    >
+                      <option value="per_day">Per day</option>
+                      <option value="per_hour">Per hour</option>
+                      <option value="per_booking">Once per booking</option>
+                    </select>
+                  </div>
+                </div>
+              ) : null}
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formData.securityDeposit?.enabled)}
+                    onChange={() => updateForm('securityDeposit', { ...formData.securityDeposit, enabled: !formData.securityDeposit?.enabled })}
+                  />
+                  Collect a refundable security deposit
+                </label>
+                {formData.securityDeposit?.enabled ? (
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.securityDeposit?.amount ?? 0}
+                    onChange={(event) => updateForm('securityDeposit', { ...formData.securityDeposit, amount: event.target.value })}
+                    className={inputClass}
+                    placeholder="Deposit amount (Rs)"
+                  />
+                ) : null}
+              </div>
+            </div>
           </div>
 
           <div className="lg:col-span-2">
@@ -1563,6 +1668,29 @@ const RentalVehicleTypes = ({ mode: propMode }) => {
                         placeholder="12"
                       />
                     </div>
+                    <div>
+                      <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-500">Pricing Unit</label>
+                      <select
+                        value={price.pricingUnit || 'hour'}
+                        onChange={(event) => updatePricingRow(price.id, 'pricingUnit', event.target.value)}
+                        className={inputClass}
+                      >
+                        <option value="hour">Per package (hourly)</option>
+                        <option value="day">Per day (price and km are per day)</option>
+                      </select>
+                    </div>
+                    {price.pricingUnit === 'day' ? (
+                      <div>
+                        <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-500">Extra Day Fee (Rs)</label>
+                        <input
+                          type="number"
+                          value={price.extraDayPrice}
+                          onChange={(event) => updatePricingRow(price.id, 'extraDayPrice', event.target.value)}
+                          className={inputClass}
+                          placeholder="Defaults to the day price"
+                        />
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               ))}

@@ -189,6 +189,7 @@ export const AdminRentalCommissionManager = lazy(() => import('../modules/admin/
 export const AdminRentalTracking = lazy(() => import('../modules/admin/pages/price-management/RentalTracking'));
 export const AdminRentalTrackingDetail = lazy(() => import('../modules/admin/pages/price-management/RentalTrackingDetail'));
 export const AdminRentalBookingRequests = lazy(() => import('../modules/admin/pages/price-management/RentalBookingRequests'));
+export const AdminRentalOperations = lazy(() => import('../modules/admin/pages/price-management/RentalOperations'));
 export const AdminRentalQuoteRequests = lazy(() => import('../modules/admin/pages/price-management/RentalQuoteRequests'));
 export const AdminRentalPackageTypes = lazy(() => import('../modules/admin/pages/price-management/RentalPackageTypes'));
 export const AdminGoodsTypes = lazy(() => import('../modules/admin/pages/price-management/GoodsTypes'));

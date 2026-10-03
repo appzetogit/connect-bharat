@@ -33,6 +33,8 @@ import { applyDriverWalletAdjustment } from '../../driver/services/walletService
 import { emitToDriver } from '../../services/dispatchService.js';
 import { sendPushNotificationToEntities } from '../../services/pushNotificationService.js';
 import { buildRentalTrackingSnapshot, updateUserRentalTracking } from '../../services/rentalTrackingService.js';
+import { computeRentalBillingMetrics } from '../../rental/services/rentalBilling.js';
+import { prepareRentalBookingExtras, serializeRentalBookingExtras } from '../../rental/services/rentalBookingHooks.js';
 import { listDriverServiceLocations } from '../../driver/services/serviceLocationService.js';
 import { listServiceStores, listSetPrices, listZones } from '../../admin/services/adminService.js';
 import { findZoneByPickup } from '../../services/matchingService.js';
@@ -1237,6 +1239,7 @@ const serializeRentalBookingRequest = (item = {}) => ({
   createdAt: item.createdAt || null,
   updatedAt: item.updatedAt || null,
   rentalTracking: buildRentalTrackingSnapshot(item),
+  ...serializeRentalBookingExtras(item),
 });
 
 const computeRentalCommissionBreakdown = (snapshot = {}, grossAmount = 0) => {
@@ -1316,47 +1319,10 @@ const resolveRentalSelectedPackagePricing = (item = {}) => {
   };
 };
 
-const computeRentalRideMetrics = (item = {}, endedAt = null) => {
-  const startDate = item.assignedAt || item.pickupDateTime || item.createdAt;
-  const startMs = startDate ? new Date(startDate).getTime() : NaN;
-  const endMs = endedAt ? new Date(endedAt).getTime() : Date.now();
-  const { includedHours, basePrice, extraHourPrice } = resolveRentalSelectedPackagePricing(item);
-  const hourlyRate = includedHours > 0 ? basePrice / includedHours : 0;
-
-  if (!Number.isFinite(startMs)) {
-    return {
-      hourlyRate: Math.max(0, hourlyRate),
-      includedHours,
-      basePrice,
-      extraHourRate: extraHourPrice,
-      elapsedMinutes: 0,
-      elapsedHours: 0,
-      currentCharge: Math.max(basePrice, Number(item.payableNow || 0)),
-      remainingDue: Math.max(0, Math.max(basePrice, Number(item.payableNow || 0)) - Number(item.payableNow || 0)),
-    };
-  }
-
-  const elapsedMs = Math.max(0, endMs - startMs);
-  const elapsedMinutes = Math.max(0, Math.ceil(elapsedMs / 60000));
-  const elapsedHours = elapsedMs / 3600000;
-  const elapsedChargeWithinPackage = elapsedHours <= includedHours
-    ? basePrice
-    : basePrice + Math.ceil(Math.max(0, elapsedHours - includedHours)) * extraHourPrice;
-  const uncappedCharge = Math.max(Number(item.payableNow || 0), elapsedChargeWithinPackage);
-  const currentCharge = Math.round((uncappedCharge + Number.EPSILON) * 100) / 100;
-  const remainingDue = Math.max(0, Math.round((currentCharge - Number(item.payableNow || 0) + Number.EPSILON) * 100) / 100);
-
-  return {
-    hourlyRate: Math.max(0, Math.round((hourlyRate + Number.EPSILON) * 100) / 100),
-    includedHours,
-    basePrice: Math.round((basePrice + Number.EPSILON) * 100) / 100,
-    extraHourRate: Math.round((extraHourPrice + Number.EPSILON) * 100) / 100,
-    elapsedMinutes,
-    elapsedHours: Math.round((elapsedHours + Number.EPSILON) * 100) / 100,
-    currentCharge,
-    remainingDue,
-  };
-};
+/// Delegates to the rental module so every surface prices a booking the same
+/// way (daily packages, km, with-driver surcharge, extensions, damage).
+/// Identical results to the old inline formula for hour-only bookings.
+const computeRentalRideMetrics = (item = {}, endedAt = null) => computeRentalBillingMetrics(item, endedAt);
 
 const resolveAuthenticatedUserObjectId = (req) => {
   const userId = String(req.auth?.sub || '').trim();
@@ -4161,6 +4127,8 @@ export const createRentalBookingRequest = async (req, res) => {
       },
     },
   };
+
+  Object.assign(update, await prepareRentalBookingExtras({ payload, vehicle, matchedPackage, update }));
 
   const request = await RentalBookingRequest.findOneAndUpdate(
     { bookingReference, userId: user._id },

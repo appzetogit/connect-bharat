@@ -72,6 +72,18 @@ import { getSupportRoleRoom } from '../../chat/services/supportChatService.js';
 import { SafetyAlert } from '../../common/models/SafetyAlert.js';
 import { getRedisStatus } from '../../../../infrastructure/redis/redisClient.js';
 import { buildRentalTrackingSnapshot, listActiveRentalTrackingBookings } from '../../services/rentalTrackingService.js';
+import {
+  computeRentalBillingMetrics,
+  normalizeDriveModes,
+  normalizePricingUnit,
+  normalizeSecurityDeposit,
+  normalizeWithDriverSurcharge,
+} from '../../rental/services/rentalBilling.js';
+import {
+  applyRentalAssignmentUpdate,
+  buildRentalBookingListFilter,
+  serializeRentalBookingExtras,
+} from '../../rental/services/rentalBookingHooks.js';
 import { sendEmail } from '../../services/mailService.js';
 import { getActivePaymentGateway, normalizePaymentSettingsPayload } from '../../services/paymentGatewayService.js';
 import { signAccessToken } from '../../services/tokenService.js';
@@ -1081,6 +1093,8 @@ const normalizeRentalPricingItem = (item = {}, index = 0) => ({
   includedKm: Math.max(0, sanitizeBusSeatPrice(item.includedKm, 0)),
   extraHourPrice: Math.max(0, sanitizeBusSeatPrice(item.extraHourPrice, 0)),
   extraKmPrice: Math.max(0, sanitizeBusSeatPrice(item.extraKmPrice, 0)),
+  pricingUnit: normalizePricingUnit(item.pricingUnit),
+  extraDayPrice: Math.max(0, sanitizeBusSeatPrice(item.extraDayPrice, 0)),
   active: item.active === undefined ? true : normalizeBoolean(item.active),
 });
 
@@ -1172,6 +1186,9 @@ const normalizeRentalVehiclePayload = (payload = {}, existing = {}) => {
       payload.advancePayment,
       existing.advancePayment,
     ),
+    driveModes: normalizeDriveModes(payload.driveModes ?? existing.driveModes),
+    withDriverSurcharge: normalizeWithDriverSurcharge(payload.withDriverSurcharge ?? existing.withDriverSurcharge ?? {}),
+    securityDeposit: normalizeSecurityDeposit(payload.securityDeposit ?? existing.securityDeposit ?? {}),
     status: payload.status
       ? (payload.status === 'inactive' ? 'inactive' : 'active')
       : normalizeBoolean(payload.active ?? existing.active ?? true)
@@ -1332,6 +1349,9 @@ const serializeRentalVehicleType = (item = {}) => ({
     : [],
   poolingEnabled: Boolean(item.poolingEnabled),
   advancePayment: normalizeRentalAdvancePayment(item.advancePayment),
+  driveModes: normalizeDriveModes(item.driveModes),
+  withDriverSurcharge: normalizeWithDriverSurcharge(item.withDriverSurcharge || {}),
+  securityDeposit: normalizeSecurityDeposit(item.securityDeposit || {}),
   blueprint: {
     templateKey: item.blueprint?.templateKey || 'compact_4',
     lowerDeck: normalizeBusDeck(item.blueprint?.lowerDeck || []),
@@ -1553,6 +1573,7 @@ const serializeRentalBookingRequest = (item = {}) => ({
   reviewedAt: item.reviewedAt || null,
   createdAt: item.createdAt || null,
   updatedAt: item.updatedAt || null,
+  ...serializeRentalBookingExtras(item),
 });
 
 const normalizeRentalCommissionRule = (rule = {}, fallbackType = 'percentage') => ({
@@ -1708,50 +1729,10 @@ const resolveRentalSelectedPackagePricing = (item = {}) => {
   };
 };
 
-const computeRentalRideMetrics = (item = {}, endedAt = null) => {
-  const startDate = item.assignedAt || item.pickupDateTime || item.createdAt;
-  const startMs = startDate ? new Date(startDate).getTime() : NaN;
-  const endMs = endedAt ? new Date(endedAt).getTime() : Date.now();
-  const { includedHours, basePrice, extraHourPrice } = resolveRentalSelectedPackagePricing(item);
-  const hourlyRate = includedHours > 0 ? basePrice / includedHours : 0;
-
-  if (!Number.isFinite(startMs)) {
-    return {
-      hourlyRate: Math.max(0, hourlyRate),
-      includedHours,
-      basePrice,
-      extraHourRate: extraHourPrice,
-      elapsedMinutes: 0,
-      elapsedHours: 0,
-      currentCharge: Math.max(basePrice, Number(item.payableNow || 0)),
-      remainingDue: Math.max(0, Math.max(basePrice, Number(item.payableNow || 0)) - Number(item.payableNow || 0)),
-    };
-  }
-
-  const elapsedMs = Math.max(0, endMs - startMs);
-  const elapsedMinutes = Math.max(0, Math.ceil(elapsedMs / 60000));
-  const elapsedHours = elapsedMs / 3600000;
-  const elapsedChargeWithinPackage = elapsedHours <= includedHours
-    ? basePrice
-    : basePrice + Math.ceil(Math.max(0, elapsedHours - includedHours)) * extraHourPrice;
-  const uncappedCharge = Math.max(Number(item.payableNow || 0), elapsedChargeWithinPackage);
-  const currentCharge = Math.round((uncappedCharge + Number.EPSILON) * 100) / 100;
-  const remainingDue = Math.max(
-    0,
-    Math.round((currentCharge - Number(item.payableNow || 0) + Number.EPSILON) * 100) / 100,
-  );
-
-  return {
-    hourlyRate: Math.max(0, Math.round((hourlyRate + Number.EPSILON) * 100) / 100),
-    includedHours,
-    basePrice: Math.round((basePrice + Number.EPSILON) * 100) / 100,
-    extraHourRate: Math.round((extraHourPrice + Number.EPSILON) * 100) / 100,
-    elapsedMinutes,
-    elapsedHours: Math.round((elapsedHours + Number.EPSILON) * 100) / 100,
-    currentCharge,
-    remainingDue,
-  };
-};
+/// Delegates to the rental module so every surface prices a booking the same
+/// way (daily packages, km, with-driver surcharge, extensions, damage).
+/// Identical results to the old inline formula for hour-only bookings.
+const computeRentalRideMetrics = (item = {}, endedAt = null) => computeRentalBillingMetrics(item, endedAt);
 
 const normalizeZoneCoordinates = (coordinates = []) => {
   if (!Array.isArray(coordinates) || coordinates.length < 3) {
@@ -10049,8 +10030,8 @@ export const updateRentalQuoteRequest = async (id, payload = {}, adminId = null)
   return serializeRentalQuoteRequest(populated);
 };
 
-export const listRentalBookingRequests = async () => {
-  const items = await RentalBookingRequest.find()
+export const listRentalBookingRequests = async (query = {}) => {
+  const items = await RentalBookingRequest.find(buildRentalBookingListFilter(query))
     .populate('userId', 'name phone email')
     .populate('vehicleTypeId', 'name vehicleCategory image pricing')
     .sort({ createdAt: -1 })
@@ -10245,6 +10226,8 @@ export const updateRentalBookingRequest = async (id, payload = {}, adminId = nul
   } else if (payload.status !== undefined && payload.status !== 'completed') {
     item.completedAt = null;
   }
+
+  await applyRentalAssignmentUpdate(item, payload);
 
   item.reviewedAt = new Date();
   item.reviewedBy = adminId || null;

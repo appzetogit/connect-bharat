@@ -1,3 +1,5 @@
+import { createDefaultRentalSettings } from '../../rental/data/defaultRentalSettings.js';
+
 export const createDefaultBusinessSettings = () => ({
   scope: 'default',
   general: {
@@ -129,6 +131,7 @@ export const createDefaultBusinessSettings = () => ({
     // off for rides so no live fare moves until an admin opts in.
     enable_ride_waiting_charge: '0',
   },
+  rental: createDefaultRentalSettings(),
   bid_ride: {
     // The master switch, and which services may be bid on at all. Both are
     // read by biddingPolicyService; an absent bidding_services means every

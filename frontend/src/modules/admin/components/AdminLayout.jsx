@@ -878,6 +878,7 @@ const AdminLayout = () => {
               { label: 'Rental Vehicles', path: '/admin/pricing/rental-vehicles', permission: 'rental.view' },
               { label: 'Track Vehicles', path: '/admin/pricing/rental-tracking', permission: 'rental.view' },
               { label: 'Rental Requests', path: '/admin/pricing/rental-requests', permission: 'rental.view' },
+              { label: 'Rental Operations', path: '/admin/pricing/rental-operations', permission: 'rental.view' },
               { label: 'Rental Quote Requests', path: '/admin/pricing/rental-quotes', permission: 'rental.view' },
               { label: 'Rental Package Types', path: '/admin/pricing/rental-packages', permission: 'rental.view' },
               { label: 'Package Pricing', path: '/admin/pricing/package-pricing', permission: 'rental.view' },

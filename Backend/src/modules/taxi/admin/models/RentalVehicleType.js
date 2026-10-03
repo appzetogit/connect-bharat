@@ -68,6 +68,20 @@ const rentalVehiclePricingSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    /// 'hour': `price` buys the whole package (`durationHours`), as before.
+    /// 'day': `price` and `includedKm` are per day and the booking is billed
+    /// for every day it spans. See rental/services/rentalBilling.js.
+    pricingUnit: {
+      type: String,
+      enum: ['hour', 'day'],
+      default: 'hour',
+    },
+    /// Late-return rate per extra day on a 'day' package (falls back to `price`).
+    extraDayPrice: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     active: {
       type: Boolean,
       default: true,
@@ -203,6 +217,28 @@ const rentalVehicleTypeSchema = new mongoose.Schema(
         label: 'Advance booking payment',
         notes: '',
       }),
+    },
+    /// Which ways this vehicle may be rented. A document saved before this
+    /// field existed has none, which reads as ['self_drive'] - today's
+    /// implicit behaviour.
+    driveModes: {
+      type: [String],
+      enum: ['self_drive', 'with_driver'],
+      default: () => ['self_drive'],
+    },
+    /// Extra charged when the rider takes a driver with the car.
+    withDriverSurcharge: {
+      amount: { type: Number, default: 0, min: 0 },
+      unit: {
+        type: String,
+        enum: ['per_booking', 'per_hour', 'per_day'],
+        default: 'per_day',
+      },
+    },
+    /// Refundable deposit held for the length of the rental. Off by default.
+    securityDeposit: {
+      enabled: { type: Boolean, default: false },
+      amount: { type: Number, default: 0, min: 0 },
     },
     status: {
       type: String,
