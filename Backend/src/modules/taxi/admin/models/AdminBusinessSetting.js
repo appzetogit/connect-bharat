@@ -17,6 +17,9 @@ const adminBusinessSettingSchema = new mongoose.Schema(
     // The schema is strict and updateGeneralSettings refuses unknown sections,
     // so the rental section has to be declared to be savable.
     rental: { type: mongoose.Schema.Types.Mixed, default: {} },
+    // Read by transportSettingsService and edited from the driver-subscription
+    // settings screen, but never declared - so a strict schema dropped saves.
+    driver_subscription: { type: mongoose.Schema.Types.Mixed, default: {} },
     referral: {
       type: mongoose.Schema.Types.Mixed,
       default: {
