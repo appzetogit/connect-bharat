@@ -34,14 +34,26 @@ const getPromoServiceLocationIds = (promo) => {
   return [...new Set(locationIds.map((value) => String(value || '').trim()).filter(Boolean))];
 };
 
+/// Anything but an explicit 'flat' is a percentage promo, so rows saved
+/// before `discount_type` existed keep their old behaviour.
+export const normalizePromoDiscountType = (value) => (
+  normalizeText(value).toLowerCase() === 'flat' ? 'flat' : 'percentage'
+);
+
 export const computePromoDiscount = ({ fare, promo, userCounter }) => {
   const safeFare = Number(fare);
   if (!Number.isFinite(safeFare) || safeFare < 0) {
     throw new ApiError(400, 'fare must be a positive number or zero');
   }
 
+  const discountType = normalizePromoDiscountType(promo?.discount_type);
   const discountPercentage = clamp(Number(promo?.discount_percentage || 0), 0, 100);
-  const rawDiscount = safeFare * (discountPercentage / 100);
+  const flatAmount = Math.max(0, Number(promo?.discount_amount || 0));
+  // A flat promo can never take more than the fare: the rider pays zero, not
+  // a negative amount the wallet would have to make good.
+  const rawDiscount = discountType === 'flat'
+    ? Math.min(flatAmount, safeFare)
+    : safeFare * (discountPercentage / 100);
   const maximumDiscountAmount = Math.max(0, Number(promo?.maximum_discount_amount || 0));
 
   const cappedDiscount = maximumDiscountAmount > 0 ? Math.min(rawDiscount, maximumDiscountAmount) : rawDiscount;
@@ -66,6 +78,8 @@ export const computePromoDiscount = ({ fare, promo, userCounter }) => {
       cumulative_remaining: remainingCumulative,
     },
     discount_percentage: discountPercentage,
+    discount_type: discountType,
+    discount_flat_amount: discountType === 'flat' ? flatAmount : 0,
   };
 };
 
@@ -175,6 +189,8 @@ export const validatePromoForContext = async ({
       maximum_discount_amount: Number(promo.maximum_discount_amount || 0),
       cumulative_max_discount_amount: Number(promo.cumulative_max_discount_amount || 0),
       discount_percentage: Number(promo.discount_percentage || 0),
+      discount_type: normalizePromoDiscountType(promo.discount_type),
+      discount_amount: Number(promo.discount_amount || 0),
       uses_per_user: Number(promo.uses_per_user || 1),
       max_uses_total: Number(promo.max_uses_total || 0),
       usage_count: Number(usageCount || 0),
@@ -396,6 +412,8 @@ export const listAvailablePromosForUser = async ({
     maximum_discount_amount: Number(promo.maximum_discount_amount || 0),
     cumulative_max_discount_amount: Number(promo.cumulative_max_discount_amount || 0),
     discount_percentage: Number(promo.discount_percentage || 0),
+    discount_type: normalizePromoDiscountType(promo.discount_type),
+    discount_amount: Number(promo.discount_amount || 0),
     uses_per_user: Number(promo.uses_per_user || 1),
     max_uses_total: Number(promo.max_uses_total || 0),
     from_date: promo.from_date,

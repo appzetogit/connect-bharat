@@ -207,29 +207,28 @@ export const computePackageFare = ({ packageRow, vehicleTypeId, tripType, roundT
 
 const isEnabledFlag = (value) => ['1', 'true', 'yes', 'on'].includes(String(value ?? '').trim().toLowerCase());
 
-/// Surge multiplier in force for a booking right now, or 1.
-///
-/// Two sources, and the larger wins rather than compounding: the global
-/// Price Hike windows, and the zone's own peak surge percentage. Both are
-/// behind the `enable_surge_pricing` switch, because production already has
-/// hike windows configured that were only ever displayed - turning them on
-/// silently with this deploy would raise live fares.
-export const resolveSurgeMultiplier = async ({ zone = null, at = new Date(), settings = null } = {}) => {
-  const rideSettings = settings || await getTransportRideSettings();
-  if (!isEnabledFlag(rideSettings?.enable_surge_pricing)) {
-    return { multiplier: 1, source: 'disabled' };
+/// Whether a Price Hike covers this booking's place. A hike with no cities
+/// and no zones is global - every hike saved before scoping existed. A scoped
+/// hike applies when the booking's city or its zone is on the hike's list.
+export const hikeAppliesToBooking = (hike, { zoneId = null, serviceLocationId = null } = {}) => {
+  const zoneIds = (hike?.zone_ids || []).map(String);
+  const locationIds = (hike?.service_location_ids || []).map(String);
+  if (zoneIds.length === 0 && locationIds.length === 0) {
+    return true;
   }
+  return (zoneId && zoneIds.includes(String(zoneId)))
+    || (serviceLocationId && locationIds.includes(String(serviceLocationId)))
+    || false;
+};
 
-  const hikes = await PriceHike.find({ active: true })
-    .select('days startTime endTime timezone multiplier')
-    .lean();
-  const hikeMultiplier = hikes
-    .filter((hike) => isHikeActiveAt(hike, clockInZone(at, hike.timezone)))
-    .map((hike) => Number(hike.multiplier) || 1)
+/// The surge rule, without the database: the highest live hike and the zone's
+/// peak percentage are compared and the larger one wins. They never compound -
+/// a 1.5x hike over a 20% peak zone is 1.5x, not 1.8x.
+export const pickSurgeMultiplier = ({ hikeMultipliers = [], zonePeakPercent = 0 } = {}) => {
+  const hikeMultiplier = hikeMultipliers
+    .map((value) => Number(value) || 1)
     .reduce((highest, value) => Math.max(highest, value), 1);
-
-  const zonePercent = toNonNegative(zone?.peak_zone_surge_percentage);
-  const zoneMultiplier = 1 + (zonePercent / 100);
+  const zoneMultiplier = 1 + (toNonNegative(zonePeakPercent) / 100);
 
   if (hikeMultiplier <= 1 && zoneMultiplier <= 1) {
     return { multiplier: 1, source: 'none' };
@@ -238,6 +237,44 @@ export const resolveSurgeMultiplier = async ({ zone = null, at = new Date(), set
   return hikeMultiplier >= zoneMultiplier
     ? { multiplier: hikeMultiplier, source: 'price_hike' }
     : { multiplier: zoneMultiplier, source: 'zone_peak' };
+};
+
+/// Surge multiplier in force for a booking right now, or 1.
+///
+/// Two sources, and the larger wins rather than compounding: the Price Hike
+/// windows that cover this booking's city or zone (or are global), and the
+/// zone's own peak surge percentage. Both are behind the `enable_surge_pricing`
+/// switch, because production already has hike windows configured that were
+/// only ever displayed - turning them on silently with this deploy would raise
+/// live fares.
+export const resolveSurgeMultiplier = async ({
+  zone = null,
+  zoneId = null,
+  serviceLocationId = null,
+  at = new Date(),
+  settings = null,
+} = {}) => {
+  const rideSettings = settings || await getTransportRideSettings();
+  if (!isEnabledFlag(rideSettings?.enable_surge_pricing)) {
+    return { multiplier: 1, source: 'disabled' };
+  }
+
+  const place = {
+    zoneId: zoneId || zone?._id || null,
+    serviceLocationId: serviceLocationId || zone?.service_location_id || null,
+  };
+  const hikes = await PriceHike.find({ active: true })
+    .select('days startTime endTime timezone multiplier service_location_ids zone_ids')
+    .lean();
+  const hikeMultipliers = hikes
+    .filter((hike) => hikeAppliesToBooking(hike, place))
+    .filter((hike) => isHikeActiveAt(hike, clockInZone(at, hike.timezone)))
+    .map((hike) => hike.multiplier);
+
+  return pickSurgeMultiplier({
+    hikeMultipliers,
+    zonePeakPercent: zone?.peak_zone_surge_percentage,
+  });
 };
 
 const resolveTimezone = async ({ zone = null, serviceLocationId = null } = {}) => {
@@ -281,7 +318,7 @@ export const quoteFareForPricingRule = async ({
 
   const resolvedZone = zone || (zoneId ? await Zone.findById(zoneId).select('peak_zone_surge_percentage service_location_id').lean() : null);
   const [surge, timezone] = await Promise.all([
-    resolveSurgeMultiplier({ zone: resolvedZone, at, settings }),
+    resolveSurgeMultiplier({ zone: resolvedZone, zoneId, serviceLocationId, at, settings }),
     resolveTimezone({ zone: resolvedZone, serviceLocationId }),
   ]);
 

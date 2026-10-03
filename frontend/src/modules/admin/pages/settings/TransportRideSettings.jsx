@@ -167,6 +167,55 @@ const TransportRideSettings = () => {
              </div>
 
              <div className="mt-10 pt-8 border-t border-gray-100">
+                <h4 className="text-[13px] font-bold text-gray-700 uppercase tracking-tight mb-1">Fare pricing</h4>
+                <p className="text-sm text-gray-500 mb-6">
+                   How taxi and outstation fares are priced. Each switch changes live fares, so
+                   turn them on deliberately.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-10 gap-y-6">
+                   <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-gray-700 block ml-0.5">Fare Source</label>
+                      <select
+                       value={settings.fare_source || 'server'}
+                       onChange={(e) => handleChange('fare_source', e.target.value)}
+                       className="w-full bg-white border border-gray-200 rounded-lg py-2.5 px-4 text-sm text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition-all outline-none shadow-sm"
+                      >
+                         <option value="server">Server (priced from Set Prices)</option>
+                         <option value="client">App (book the fare the app sends)</option>
+                      </select>
+                   </div>
+
+                   <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-gray-700 block ml-0.5">Enable Surge Pricing</label>
+                      <select
+                       value={String(settings.enable_surge_pricing ?? '0')}
+                       onChange={(e) => handleChange('enable_surge_pricing', e.target.value)}
+                       className="w-full bg-white border border-gray-200 rounded-lg py-2.5 px-4 text-sm text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition-all outline-none shadow-sm"
+                      >
+                         <option value="0">No (Price Hike slots are display only)</option>
+                         <option value="1">Yes (charge Price Hike and zone peak surge)</option>
+                      </select>
+                   </div>
+
+                   <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-gray-700 block ml-0.5">Charge Waiting Time On Rides</label>
+                      <select
+                       value={String(settings.enable_ride_waiting_charge ?? '0')}
+                       onChange={(e) => handleChange('enable_ride_waiting_charge', e.target.value)}
+                       className="w-full bg-white border border-gray-200 rounded-lg py-2.5 px-4 text-sm text-gray-900 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition-all outline-none shadow-sm"
+                      >
+                         <option value="0">No (parcels only)</option>
+                         <option value="1">Yes (taxi and outstation too)</option>
+                      </select>
+                      <p className="text-xs text-gray-500">
+                         Uses each Set Price row&apos;s waiting charge and free waiting minutes.
+                      </p>
+                   </div>
+                </div>
+             </div>
+
+             <div className="mt-10 pt-8 border-t border-gray-100">
                 <h4 className="text-[13px] font-bold text-gray-700 uppercase tracking-tight mb-1">Bidding rides</h4>
                 <p className="text-sm text-gray-500 mb-6">
                    A ride being bid on runs on its own clock. Leave these equal to the regular

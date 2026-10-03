@@ -97,6 +97,11 @@ const buildSetPriceGroupingSignature = (item = {}) => JSON.stringify({
   waiting_charge: Number(item.waiting_charge ?? 0),
   free_waiting_before: Number(item.free_waiting_before ?? 0),
   free_waiting_after: Number(item.free_waiting_after ?? 0),
+  minimum_fare: Number(item.minimum_fare ?? 0),
+  night_charge_type: item.night_charge_type || 'percentage',
+  night_charge: Number(item.night_charge ?? 0),
+  night_start_time: item.night_start_time || '22:00',
+  night_end_time: item.night_end_time || '06:00',
   outstation_base_price: Number(item.outstation_base_price ?? 0),
   outstation_base_distance: Number(item.outstation_base_distance ?? 0),
   outstation_price_per_distance: Number(item.outstation_price_per_distance ?? 0),
@@ -154,6 +159,8 @@ const NON_NEGATIVE_FORM_FIELDS = new Set([
   'waiting_charge',
   'free_waiting_before',
   'free_waiting_after',
+  'minimum_fare',
+  'night_charge',
   'support_airport_fee',
   'airport_surge',
   'outstation_base_price',
@@ -223,6 +230,11 @@ const initialFormState = {
   waiting_charge: '',
   free_waiting_before: '',
   free_waiting_after: '',
+  minimum_fare: '',
+  night_charge_type: 'percentage',
+  night_charge: '',
+  night_start_time: '22:00',
+  night_end_time: '06:00',
   enable_airport_ride: false,
   support_airport_fee: '',
   airport_surge: '',
@@ -399,6 +411,11 @@ const SetPrices = ({ mode }) => {
           payment_type: normalizePaymentTypes(pData.payment_type).length ? normalizePaymentTypes(pData.payment_type) : ['cash'],
           user_cancellation_fee_type: pData.user_cancellation_fee_type || 'percentage',
           driver_cancellation_fee_type: pData.driver_cancellation_fee_type || 'percentage',
+          minimum_fare: pData.minimum_fare ?? '',
+          night_charge_type: pData.night_charge_type === 'fixed' ? 'fixed' : 'percentage',
+          night_charge: pData.night_charge ?? '',
+          night_start_time: pData.night_start_time || '22:00',
+          night_end_time: pData.night_end_time || '06:00',
         });
       }
       
@@ -424,6 +441,8 @@ const SetPrices = ({ mode }) => {
       { name: 'Price Per Distance', val: formData.price_per_distance },
       { name: 'Time Price', val: formData.time_price },
       { name: 'Waiting Charge', val: formData.waiting_charge },
+      { name: 'Minimum Fare', val: formData.minimum_fare },
+      { name: 'Night Charge', val: formData.night_charge },
       { name: 'User Cancellation Fee', val: formData.user_cancellation_fee },
       { name: 'Driver Cancellation Fee', val: formData.driver_cancellation_fee },
       ...(formData.enable_airport_ride ? [
@@ -951,6 +970,29 @@ const SetPrices = ({ mode }) => {
                      <div>
                         <label className={labelClass}>Free Wait (After) <span className="text-rose-500">*</span></label>
                         <input type="number" min="0" required className={inputClass + " py-1"} value={formData.free_waiting_after} onChange={e => setFormData(p=>({...p, free_waiting_after: clampNonNegativeInput('free_waiting_after', e.target.value)}))} />
+                     </div>
+                     {/* Charged by the server fare engine. 0 / blank means none. */}
+                     <div>
+                        <label className={labelClass}>Minimum Fare</label>
+                        <input type="number" min="0" className={inputClass + " py-1"} placeholder="0 = none" value={formData.minimum_fare} onChange={e => setFormData(p=>({...p, minimum_fare: clampNonNegativeInput('minimum_fare', e.target.value)}))} />
+                     </div>
+                     <div>
+                        <label className={labelClass}>Night Charge</label>
+                        <div className="flex gap-1">
+                           <select className={inputClass + " w-20 py-1"} value={formData.night_charge_type} onChange={e => setFormData(p=>({...p, night_charge_type: e.target.value}))}>
+                              <option value="percentage">%</option>
+                              <option value="fixed">Fixed</option>
+                           </select>
+                           <input type="number" min="0" className={inputClass + " py-1"} placeholder="0 = none" value={formData.night_charge} onChange={e => setFormData(p=>({...p, night_charge: clampNonNegativeInput('night_charge', e.target.value)}))} />
+                        </div>
+                     </div>
+                     <div>
+                        <label className={labelClass}>Night Starts</label>
+                        <input type="time" className={inputClass + " py-1"} value={formData.night_start_time} onChange={e => setFormData(p=>({...p, night_start_time: e.target.value}))} />
+                     </div>
+                     <div>
+                        <label className={labelClass}>Night Ends</label>
+                        <input type="time" className={inputClass + " py-1"} value={formData.night_end_time} onChange={e => setFormData(p=>({...p, night_end_time: e.target.value}))} />
                      </div>
                      <div className="col-span-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-2 gap-y-1 pt-1 border-t border-gray-100 mt-1">
                         <div className="flex items-center gap-1">

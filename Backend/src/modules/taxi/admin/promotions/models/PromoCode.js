@@ -79,6 +79,20 @@ const promoCodeSchema = new mongoose.Schema(
       min: 0,
       max: 100,
     },
+    /// 'percentage' keeps every promo created before flat discounts existed
+    /// working exactly as it did; 'flat' takes `discount_amount` rupees off,
+    /// still bounded by the maximum and cumulative caps and by the fare itself.
+    discount_type: {
+      type: String,
+      enum: ['percentage', 'flat'],
+      default: 'percentage',
+      trim: true,
+    },
+    discount_amount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     from_date: {
       type: Date,
       required: true,

@@ -11950,8 +11950,18 @@ const serializePriceHike = (item) => ({
   timezone: item.timezone || 'Asia/Kolkata',
   multiplier: Number(item.multiplier ?? 1),
   active: Boolean(item.active),
+  // Empty on both means the hike applies everywhere.
+  service_location_ids: (item.service_location_ids || []).map(String),
+  zone_ids: (item.zone_ids || []).map(String),
   updatedAt: item.updatedAt,
 });
+
+/// A hike's city / zone list: valid ids only, de-duplicated. Anything else
+/// (missing, a single id, junk) collapses to [], meaning "everywhere".
+const priceHikeScopeIds = (value) => {
+  const values = Array.isArray(value) ? value : (value ? [value] : []);
+  return [...new Set(values.map((id) => String(id || '').trim()).filter((id) => mongoose.Types.ObjectId.isValid(id)))];
+};
 
 const normalizePriceHikePayload = (payload = {}) => {
   const time = (value, fallback) => {
@@ -11975,6 +11985,8 @@ const normalizePriceHikePayload = (payload = {}) => {
     timezone: String(payload.timezone || 'Asia/Kolkata').trim() || 'Asia/Kolkata',
     multiplier: Number.isFinite(multiplier) && multiplier >= 1 ? multiplier : 1,
     active: normalizeBoolean(payload.active ?? false),
+    service_location_ids: priceHikeScopeIds(payload.service_location_ids),
+    zone_ids: priceHikeScopeIds(payload.zone_ids),
   };
 };
 

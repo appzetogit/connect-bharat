@@ -110,6 +110,8 @@ const serializePromoCode = (item) => ({
   maximum_discount_amount: Number(item.maximum_discount_amount || 0),
   cumulative_max_discount_amount: Number(item.cumulative_max_discount_amount || 0),
   discount_percentage: Number(item.discount_percentage || 0),
+  discount_type: String(item.discount_type || '').trim().toLowerCase() === 'flat' ? 'flat' : 'percentage',
+  discount_amount: Number(item.discount_amount || 0),
   from: item.from_date || item.from || '',
   to: item.to_date || item.to || '',
   uses_per_user: Number(item.uses_per_user || 1),
@@ -278,6 +280,8 @@ const normalizePromoPayload = async (payload, existing = null) => {
     0,
   );
   const discountPercentage = parseNumber(payload.discount_percentage ?? existing?.discount_percentage, 0);
+  const discountType = normalizeText(payload.discount_type ?? existing?.discount_type ?? 'percentage').toLowerCase() || 'percentage';
+  const discountAmount = parseNumber(payload.discount_amount ?? existing?.discount_amount, 0);
   const usesPerUser = Math.max(1, Math.floor(parseNumber(payload.uses_per_user ?? existing?.uses_per_user, 1)));
   const maxUsesTotal = Math.max(0, Math.floor(parseNumber(payload.max_uses_total ?? existing?.max_uses_total, 0)));
   const fromDate = normalizeDate(payload.from ?? payload.from_date ?? existing?.from_date, 'From date');
@@ -295,6 +299,15 @@ const normalizePromoPayload = async (payload, existing = null) => {
   if (discountPercentage < 0 || discountPercentage > 100) {
     throw new ApiError(400, 'Discount percentage must be between 0 and 100');
   }
+  if (!['percentage', 'flat'].includes(discountType)) {
+    throw new ApiError(400, 'Discount type must be percentage or flat');
+  }
+  if (discountAmount < 0) {
+    throw new ApiError(400, 'Discount amount must be greater than or equal to 0');
+  }
+  if (discountType === 'flat' && discountAmount <= 0) {
+    throw new ApiError(400, 'Discount amount is required for a flat discount');
+  }
 
   if (fromDate > toDate) {
     throw new ApiError(400, 'From date must be earlier than or equal to To date');
@@ -311,6 +324,8 @@ const normalizePromoPayload = async (payload, existing = null) => {
     maximum_discount_amount: maximumDiscountAmount,
     cumulative_max_discount_amount: cumulativeMaxDiscountAmount,
     discount_percentage: discountPercentage,
+    discount_type: discountType,
+    discount_amount: discountAmount,
     from_date: fromDate,
     to_date: toDate,
     uses_per_user: usesPerUser,

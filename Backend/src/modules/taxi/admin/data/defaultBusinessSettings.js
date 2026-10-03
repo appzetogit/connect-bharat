@@ -101,6 +101,10 @@ export const createDefaultBusinessSettings = () => ({
     // A round-trip intercity package costs this many one-way fares. 1.8 is what
     // the apps have always quoted.
     outstation_round_trip_multiplier: '1.8',
+    // Bill taxi and outstation riders for time the driver waited at pickup
+    // beyond the Set Price row's free minutes. Parcels always had this; it is
+    // off for rides so no live fare moves until an admin opts in.
+    enable_ride_waiting_charge: '0',
   },
   bid_ride: {
     // The master switch, and which services may be bid on at all. Both are

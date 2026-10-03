@@ -50,6 +50,8 @@ const createInitialFormData = () => ({
   maximum_discount_amount: '',
   cumulative_max_discount_amount: '',
   discount_percentage: '',
+  discount_type: 'percentage',
+  discount_amount: '',
   from: '',
   to: '',
   uses_per_user: '1',
@@ -316,6 +318,8 @@ const PromoCodes = () => {
           maximum_discount_amount: promo.maximum_discount_amount || '',
           cumulative_max_discount_amount: promo.cumulative_max_discount_amount || '',
           discount_percentage: promo.discount_percentage || '',
+          discount_type: promo.discount_type === 'flat' ? 'flat' : 'percentage',
+          discount_amount: promo.discount_amount || '',
           from: promo.from ? new Date(promo.from).toISOString().split('T')[0] : '',
           to: promo.to ? new Date(promo.to).toISOString().split('T')[0] : '',
           uses_per_user: promo.uses_per_user || '1',
@@ -366,9 +370,14 @@ const PromoCodes = () => {
       return alert('Minimum trip amount must be a valid positive number');
     }
     
+    const isFlatDiscount = formData.discount_type === 'flat';
     const discPercentage = Number(formData.discount_percentage);
     const maxDiscAmount = Number(formData.maximum_discount_amount);
-    if ((isNaN(discPercentage) || discPercentage <= 0) && (isNaN(maxDiscAmount) || maxDiscAmount <= 0)) {
+    const flatAmount = Number(formData.discount_amount);
+    if (isFlatDiscount && (isNaN(flatAmount) || flatAmount <= 0)) {
+      return alert('Please provide a valid flat discount amount');
+    }
+    if (!isFlatDiscount && (isNaN(discPercentage) || discPercentage <= 0) && (isNaN(maxDiscAmount) || maxDiscAmount <= 0)) {
       return alert('Please provide a valid discount percentage or discount amount');
     }
     
@@ -394,7 +403,9 @@ const PromoCodes = () => {
         minimum_trip_amount: Number(formData.minimum_trip_amount),
         maximum_discount_amount: Number(formData.maximum_discount_amount),
         cumulative_max_discount_amount: Number(formData.cumulative_max_discount_amount),
-        discount_percentage: Number(formData.discount_percentage),
+        discount_percentage: Number(formData.discount_percentage) || 0,
+        discount_type: isFlatDiscount ? 'flat' : 'percentage',
+        discount_amount: isFlatDiscount ? Number(formData.discount_amount) : 0,
         uses_per_user: Number(formData.uses_per_user),
         service_location_id: formData.service_location_ids[0] || formData.service_location_id,
         service_location_ids: formData.service_location_ids,
@@ -836,19 +847,51 @@ const PromoCodes = () => {
 
                   <div>
                     <FieldLabel icon={Percent} required>
-                      Discount Percentage
+                      Discount Type
                     </FieldLabel>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="Enter Discount Percentage"
-                      required
-                      value={formData.discount_percentage}
-                      onChange={(e) => handleFieldChange('discount_percentage', e.target.value)}
+                    <select
+                      value={formData.discount_type}
+                      onChange={(e) => handleFieldChange('discount_type', e.target.value)}
                       className={inputClass}
-                    />
+                    >
+                      <option value="percentage">Percentage of fare</option>
+                      <option value="flat">Flat amount</option>
+                    </select>
                   </div>
+
+                  {formData.discount_type === 'flat' ? (
+                    <div>
+                      <FieldLabel icon={IndianRupee} required>
+                        Flat Discount Amount
+                      </FieldLabel>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="Amount off the fare"
+                        required
+                        value={formData.discount_amount}
+                        onChange={(e) => handleFieldChange('discount_amount', e.target.value)}
+                        className={inputClass}
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <FieldLabel icon={Percent} required>
+                        Discount Percentage
+                      </FieldLabel>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="Enter Discount Percentage"
+                        required
+                        value={formData.discount_percentage}
+                        onChange={(e) => handleFieldChange('discount_percentage', e.target.value)}
+                        className={inputClass}
+                      />
+                    </div>
+                  )}
 
                   <div>
                     <FieldLabel icon={Calendar} required>

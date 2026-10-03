@@ -48,6 +48,18 @@ const priceHikeSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Where the hike applies. Both empty means everywhere, which is how every
+    // hike saved before these existed behaves. Otherwise a booking is surged
+    // when its city is in `service_location_ids` or its zone is in `zone_ids`,
+    // so an admin can surge a whole city or just its airport zone.
+    service_location_ids: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'TaxiServiceLocation' }],
+      default: [],
+    },
+    zone_ids: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'TaxiZone' }],
+      default: [],
+    },
   },
   { timestamps: true },
 );

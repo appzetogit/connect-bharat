@@ -21,10 +21,11 @@ import { applyPromoToRideInTransaction } from './promoService.js';
 import { getTipSettings } from './appSettingsService.js';
 import { getBidRideSettings } from './transportSettingsService.js';
 import { resolveBiddingPolicy } from './biddingPolicyService.js';
-import { resolveRideRoute } from './routeService.js';
+import { resolveRouteCached } from './routeService.js';
 import { computePackageFare, quoteFareForPricingRule } from './fareEngineService.js';
 import { getTransportRideSettings } from './transportSettingsService.js';
 import { findZoneByPickup } from './matchingService.js';
+import { applyRideWaitingCharge, recordWaitingChargeInBreakdown } from './rideWaitingChargeService.js';
 
 const clearUserActiveRideIfPresent = async (user) => {
   if (!user?.currentRideId) {
@@ -952,7 +953,12 @@ const buildDriverVehicleAcceptFilter = async (ride) => {
 const PARCEL_WAITING_CHARGE_CAP_MINUTES = 60;
 
 const applyParcelWaitingCharge = async (ride) => {
-  if (!ride || (ride.serviceType || 'ride') !== 'parcel') return;
+  if (!ride) return;
+  // Taxi and outstation rides: their own path, behind a setting.
+  if ((ride.serviceType || 'ride') !== 'parcel') {
+    await applyRideWaitingCharge(ride);
+    return;
+  }
   if (!ride.arrivedAt || !ride.startedAt) return;
   if (Number(ride.waitingCharge) > 0) return; // already applied
 
@@ -991,6 +997,7 @@ const applyParcelWaitingCharge = async (ride) => {
   // Added before the ride is saved, because the wallet settlement that follows
   // completion reads ride.fare.
   ride.fare = Math.round((Number(ride.fare || 0) + charge) * 100) / 100;
+  recordWaitingChargeInBreakdown(ride, { chargeableMinutes, charge });
 };
 
 const syncDeliveryWithRide = async (ride) => {
@@ -1042,7 +1049,7 @@ const syncDeliveryWithRide = async (ride) => {
 /// what is charged. With no row - a vehicle the admin never priced - the app's
 /// figure is still taken, as it always was, so a gap in the tariff does not
 /// stop bookings; `fare_source: 'client'` marks those rides for the admin.
-const resolveBookingFare = async ({
+export const resolveBookingFare = async ({
   clientFare,
   serverPricedFareSource,
   pricingRule,
@@ -1218,7 +1225,9 @@ export const createRideRecord = async ({
 
   // Never fatal: `resolveRideRoute` swallows its own failures and returns null,
   // so a routing outage costs a polyline rather than the booking.
-  const resolvedRoute = await resolveRideRoute({ pickupCoords, dropCoords });
+  // Through the shared route cache, so a booking made from a /rides/estimate
+  // quote prices the same route the quote did.
+  const resolvedRoute = await resolveRouteCached({ origin: pickupCoords, destination: dropCoords }).catch(() => null);
 
   // Deliveries send neither figure, and a rider's estimate is only ever a
   // guess, so the routed values win where we have them.

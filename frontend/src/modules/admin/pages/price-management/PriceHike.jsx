@@ -26,7 +26,23 @@ const blankHike = () => ({
   end_time: '11:00',
   multiplier: 1.5,
   active: false,
+  service_location_ids: [],
+  zone_ids: [],
 });
+
+// The list endpoints answer in a few shapes; take the array wherever it is.
+const unwrapList = (response) => {
+  const payload = response?.data ?? response;
+  const list = payload?.results || payload?.data?.results || payload?.data || payload;
+  return Array.isArray(list) ? list : [];
+};
+
+const toOption = (item) => ({
+  id: String(item?._id || item?.id || ''),
+  name: item?.name || item?.service_location_name || item?.zone_name || 'Unnamed',
+});
+
+const selectedValues = (event) => Array.from(event.target.selectedOptions).map((option) => option.value);
 
 const PriceHike = () => {
   const navigate = useNavigate();
@@ -34,13 +50,26 @@ const PriceHike = () => {
   const [savingId, setSavingId] = useState(null);
   const [hikes, setHikes] = useState([]);
   const [activeMultiplier, setActiveMultiplier] = useState(1);
+  const [cities, setCities] = useState([]);
+  const [zones, setZones] = useState([]);
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get('/admin/price-hikes');
+      const [res, cityRes, zoneRes] = await Promise.all([
+        api.get('/admin/price-hikes'),
+        // Scope pickers are a nicety: a failure here must not hide the hikes.
+        api.get('/admin/service-locations').catch(() => null),
+        api.get('/admin/zones').catch(() => null),
+      ]);
       const payload = res.data || res;
-      setHikes(Array.isArray(payload.results) ? payload.results : []);
+      setHikes((Array.isArray(payload.results) ? payload.results : []).map((row) => ({
+        ...row,
+        service_location_ids: Array.isArray(row.service_location_ids) ? row.service_location_ids : [],
+        zone_ids: Array.isArray(row.zone_ids) ? row.zone_ids : [],
+      })));
+      setCities(unwrapList(cityRes).map(toOption).filter((item) => item.id));
+      setZones(unwrapList(zoneRes).map(toOption).filter((item) => item.id));
       setActiveMultiplier(Number(payload.active_multiplier || 1));
     } catch (err) {
       console.error('Fetch price hikes failed:', err);
@@ -89,6 +118,8 @@ const PriceHike = () => {
       end_time: row.end_time,
       multiplier: Number(row.multiplier),
       active: row.active,
+      service_location_ids: row.service_location_ids || [],
+      zone_ids: row.zone_ids || [],
     };
 
     try {
@@ -177,7 +208,9 @@ const PriceHike = () => {
       <p className="text-[11px] text-gray-500 mb-3">
         While a slot is active, every vehicle&apos;s base fare, per-km rate and per-minute rate are
         multiplied. Distance and time allowances, taxes and commissions are not changed. Times are
-        local to the timezone shown on each slot.
+        local to the timezone shown on each slot. Leave cities and zones empty to apply a slot
+        everywhere; otherwise it applies to bookings in any selected city or zone. Fares are only
+        surged when &quot;Enable surge pricing&quot; is on in Transport Ride settings.
       </p>
 
       {hikes.length === 0 ? (
@@ -259,6 +292,51 @@ const PriceHike = () => {
                       <Trash2 size={14} />
                     </button>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-3">
+                  <div>
+                    <label className={labelClass}>
+                      Cities {row.service_location_ids.length === 0 ? '(all)' : `(${row.service_location_ids.length})`}
+                    </label>
+                    <select
+                      multiple
+                      size={4}
+                      className={inputClass}
+                      value={row.service_location_ids}
+                      onChange={(e) => updateLocal(index, 'service_location_ids', selectedValues(e))}
+                    >
+                      {cities.map((city) => (
+                        <option key={city.id} value={city.id}>{city.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelClass}>
+                      Zones {row.zone_ids.length === 0 ? '(all)' : `(${row.zone_ids.length})`}
+                    </label>
+                    <select
+                      multiple
+                      size={4}
+                      className={inputClass}
+                      value={row.zone_ids}
+                      onChange={(e) => updateLocal(index, 'zone_ids', selectedValues(e))}
+                    >
+                      {zones.map((zone) => (
+                        <option key={zone.id} value={zone.id}>{zone.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {(row.service_location_ids.length > 0 || row.zone_ids.length > 0) && (
+                    <button
+                      onClick={() => setHikes((prev) => prev.map((item, i) => (
+                        i === index ? { ...item, service_location_ids: [], zone_ids: [] } : item
+                      )))}
+                      className="text-[10px] text-indigo-600 font-semibold text-left"
+                    >
+                      Clear scope (apply everywhere)
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1.5 mt-3">
