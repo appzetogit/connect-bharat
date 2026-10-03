@@ -5,6 +5,7 @@ import { Delivery } from '../../user/models/Delivery.js';
 import { Ride } from '../../user/models/Ride.js';
 import { User } from '../../user/models/User.js';
 import { emitToAdmins } from '../../services/dispatchService.js';
+import { queueSosFanout } from '../services/sosFanoutService.js';
 
 const cleanString = (value = '') => String(value || '').trim();
 
@@ -219,6 +220,8 @@ export const triggerUserSosAlert = asyncHandler(async (req, res) => {
   const payload = serializeSafetyAlert(alert);
   emitToAdmins('new_sos', payload);
   emitToAdmins('safety:alert:new', payload);
+  // Emergency-contact SMS and fleet-owner push. Async and never throws.
+  queueSosFanout({ alert, sourceApp: 'user' });
 
   res.json({ success: true, data: payload });
 });
@@ -242,6 +245,8 @@ export const triggerDriverSosAlert = asyncHandler(async (req, res) => {
   const payload = serializeSafetyAlert(alert);
   emitToAdmins('new_sos', payload);
   emitToAdmins('safety:alert:new', payload);
+  // Emergency-contact SMS and fleet-owner push. Async and never throws.
+  queueSosFanout({ alert, sourceApp: 'driver' });
 
   res.json({ success: true, data: payload });
 });

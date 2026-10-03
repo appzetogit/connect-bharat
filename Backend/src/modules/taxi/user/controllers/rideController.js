@@ -388,6 +388,8 @@ export const listMyRides = async (req, res) => {
     limit: req.query.limit,
     page: req.query.page,
     category: req.query.category,
+    from: req.query.from,
+    to: req.query.to,
   });
 
   res.json({

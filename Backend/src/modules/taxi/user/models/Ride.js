@@ -736,6 +736,13 @@ const rideSchema = new mongoose.Schema(
         default: null,
       },
     },
+    /// The driver's rating of the rider, the mirror of `feedback`. Separate so
+    /// neither side's submission can overwrite the other's.
+    driverFeedback: {
+      rating: { type: Number, default: null, min: 1, max: 5 },
+      comment: { type: String, default: '', trim: true, maxlength: 500 },
+      createdAt: { type: Date, default: null },
+    },
   },
   { timestamps: true },
 );

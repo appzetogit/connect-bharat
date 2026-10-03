@@ -50,6 +50,18 @@ export const createDefaultThirdPartySettings = () => {
         api_key: '',
         sid: '',
       },
+      // SMS to a rider's / driver's emergency contacts when they press SOS.
+      // Off until the admin registers a DLT template for the text and enters
+      // its id: operators drop unregistered text, so "on" without one would
+      // only look like it works. Placeholders: {app} {name} {phone} {link}
+      // {trip} {vehicle}.
+      sos_alert: {
+        enabled: '0',
+        template_id: '',
+        template_text: 'SOS from {app}: {name} ({phone}) needs help. Location: {link} Trip: {trip} Vehicle: {vehicle}',
+        // Push the ride's fleet owner (if the driver has one). Free, so on.
+        notify_fleet_owner: '1',
+      },
     },
     payment: {
       razor_pay: {
@@ -75,6 +87,18 @@ export const createDefaultThirdPartySettings = () => {
         live_secret_key: '',
         live_publishable_key: '',
       },
+    },
+    // Call masking. Off by default: with it off, `POST /rides/:id/call` returns
+    // the other party's number exactly as the apps already show it.
+    exotel: {
+      enabled: '0',
+      sid: '',
+      api_key: '',
+      api_token: '',
+      caller_id: '',
+      subdomain: 'api.exotel.com',
+      // Seconds before Exotel hangs up a bridged call; 0 = Exotel's default.
+      time_limit: 0,
     },
     recharge_api: {
       enabled: '0',
