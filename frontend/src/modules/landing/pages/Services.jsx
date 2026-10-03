@@ -24,7 +24,7 @@ const Services = ({ openBookingModal }) => {
     String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '').replace(/^zi/, '');
 
   const cmsItems = servicesPage.items || [];
-  // Prefix matching, not equality: the module is "Zi City Ride" while the
+  // Prefix matching, not equality: the module may carry a brand prefix ("Zi City Ride") while the
   // write-up is titled "City Ride (Local Cabs)", and neither name is going to be
   // edited to suit the other.
   const findCmsMatch = (title) => {

@@ -732,8 +732,8 @@ const closeDriverRequestWindow = (rideId, driverIds = []) => {
   sendRideOfferClosedPush(safeDriverIds, rideId);
 };
 
-/// The real, admin-configured vehicle-type name (e.g. "Zi Mini Truck",
-/// "Zi Scooty Parcel") — shown on the driver's offer so they know which of
+/// The real, admin-configured vehicle-type name (e.g. "Mini Truck",
+/// "Scooty Parcel") — shown on the driver's offer so they know which of
 /// their registered vehicle types this particular request is for. Distinct
 /// from `serviceType` ('ride'/'parcel'), which only says whether it's a
 /// passenger trip or a delivery, not which vehicle class within it.
@@ -855,7 +855,7 @@ const emitRideRequestToDrivers = async ({
         ),
         tripDistanceKm: formatOfferKm(ride.estimatedDistanceMeters),
         vehicleIconType: ride.vehicleIconType || '',
-        // The real catalog name ("Zi Mini Truck") when the vehicle resolved;
+        // The real catalog name ("Mini Truck") when the vehicle resolved;
         // falls back to the generic type only if it didn't (e.g. a ride with
         // no vehicleTypeId at all), so the card is never blank.
         vehicleLabel: vehicleLabel || (ride.serviceType === 'parcel' ? 'Parcel' : 'Ride'),

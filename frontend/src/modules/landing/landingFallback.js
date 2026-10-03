@@ -87,8 +87,8 @@ export const LANDING_FALLBACK = {
     // Empty: the site uses the logo from General Settings. Set this only to
     // give the website a different logo from the rest of the product.
     logo: '',
-    wordmarkPrimary: 'ZI',
-    wordmarkSecondary: 'CAB',
+    wordmarkPrimary: 'Connect',
+    wordmarkSecondary: 'Bharat',
     tagline: 'Your Ride. Our Priority.',
     appBlurb: 'Book rides in seconds, track drivers live, and manage invoices with the Connect Bharat app.',
     playStoreUrl: '',

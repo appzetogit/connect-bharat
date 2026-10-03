@@ -219,14 +219,14 @@ const Footer = ({ setActiveTab }) => {
           }
 
           .footer-logo .logo-zi {
-            font-size: 28px;
+            font-size: 24px;
             font-weight: 800;
             color: #FFFFFF;
             font-style: italic;
           }
 
           .footer-logo .logo-cab {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 800;
             color: #00BBA9;
             margin-left: 4px;

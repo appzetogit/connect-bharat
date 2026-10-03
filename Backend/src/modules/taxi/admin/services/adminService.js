@@ -6886,7 +6886,7 @@ export const listPublicVehicleCatalog = async () => {
     icon_types: item.icon_types || 'car',
     category: item.category || '',
     delivery_category: item.delivery_category || '',
-    // Which home-screen modules (Zi Airport, Zi City Ride, Zi Parcel, ...)
+    // Which home-screen modules (Airport, City Ride, Parcel, ...)
     // this vehicle is offered under. Empty means every module — see the
     // schema comment on Vehicle.app_modules for why.
     app_modules: Array.isArray(item.app_modules) ? item.app_modules.map(String) : [],
