@@ -4,6 +4,10 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { corporateAdminService, errorText } from '../../services/corporateAdminService';
 import { Field, TermsFields, inputClass, termsPayload } from './corporateUi';
+import CommercialFields from './CommercialFields';
+import { commercialPayload, commercialToForm, useAdminVehicleTypes, validateCommercial } from './corporateCommercial';
+import TravelZoneEditor from '../../../corporate/components/TravelZoneEditor';
+import { travelZoneToBody, travelZoneToForm, validateTravelZone } from '../../../corporate/components/helpers';
 
 /**
  * Admin-created corporate (SOW 2.13). With ?enquiryId=... it converts a
@@ -30,11 +34,19 @@ export default function CorporateCreate() {
     approveNow: true,
   });
   const [terms, setTerms] = useState({ creditLimit: 50000, paymentTermsDays: 30, discount: { type: 'percentage', value: 0, maxPerTrip: 0, appliesTo: ['ride', 'parcel', 'intercity', 'rental'] } });
+  const [commercial, setCommercial] = useState(() => commercialToForm());
+  const [travelZone, setTravelZone] = useState(() => travelZoneToForm());
+  const vehicleTypes = useAdminVehicleTypes();
   const [busy, setBusy] = useState(false);
   const set = (key) => (event) => setForm((previous) => ({ ...previous, [key]: event.target.value }));
 
   const submit = async (event) => {
     event.preventDefault();
+    const problem = validateCommercial(commercial) || validateTravelZone(travelZone);
+    if (problem) {
+      toast.error(problem);
+      return;
+    }
     setBusy(true);
     const body = {
       ...(form.name ? { name: form.name } : {}),
@@ -52,6 +64,8 @@ export default function CorporateCreate() {
       },
       status: form.approveNow ? 'approved' : 'pending',
       ...termsPayload(terms),
+      ...commercialPayload(commercial),
+      travelZone: travelZoneToBody(travelZone),
     };
     try {
       const result = enquiryId
@@ -96,6 +110,14 @@ export default function CorporateCreate() {
           <h2 className="font-semibold text-gray-900">Credit and discount</h2>
           <TermsFields value={terms} onChange={setTerms} />
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.approveNow} onChange={(e) => setForm({ ...form, approveNow: e.target.checked })} /> Approve now</label>
+        </section>
+        <section className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
+          <h2 className="font-semibold text-gray-900">Billing, tariff and commission</h2>
+          <CommercialFields value={commercial} onChange={setCommercial} vehicleTypes={vehicleTypes} />
+        </section>
+        <section className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
+          <h2 className="font-semibold text-gray-900">Travel zone</h2>
+          <TravelZoneEditor value={travelZone} onChange={setTravelZone} />
         </section>
         <button type="submit" disabled={busy} className="inline-flex items-center gap-2 bg-gray-900 text-white text-sm font-semibold rounded-lg px-4 py-2.5 disabled:opacity-50">
           {busy && <Loader2 size={14} className="animate-spin" />} Create corporate

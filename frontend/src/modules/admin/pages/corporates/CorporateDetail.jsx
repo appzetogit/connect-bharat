@@ -1,11 +1,210 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Download, Loader2 } from 'lucide-react';
 import { corporateAdminService, errorText } from '../../services/corporateAdminService';
 import { Field, StatusPill, TermsFields, formatDate, formatMoney, inputClass, termsPayload } from './corporateUi';
+import CommercialFields from './CommercialFields';
+import { commercialPayload, commercialToForm, useAdminVehicleTypes, validateCommercial } from './corporateCommercial';
+import TravelZoneEditor from '../../../corporate/components/TravelZoneEditor';
+import RolesManager from '../../../corporate/components/RolesManager';
+import ChangeRoleModal from '../../../corporate/components/ChangeRoleModal';
+import InvoiceBreakdown from '../../../corporate/components/InvoiceBreakdown';
+import { Drawer } from '../../../corporate/components/ui';
+import { formatKm, travelZoneToBody, travelZoneToForm, validateTravelZone } from '../../../corporate/components/helpers';
 
-const TABS = ['overview', 'employees', 'invoices', 'ledger', 'trips'];
+const TABS = ['overview', 'employees', 'roles', 'allowance', 'invoices', 'ledger', 'trips'];
+
+/** ISO week key, e.g. "2026-W41" — the same format as `<input type="week">`. */
+const isoWeekKey = (date = new Date()) => {
+  const day = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const weekday = day.getUTCDay() || 7;
+  day.setUTCDate(day.getUTCDate() + 4 - weekday);
+  const yearStart = new Date(Date.UTC(day.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((day - yearStart) / 864e5 + 1) / 7);
+  return `${day.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+};
+
+const thisMonth = () => {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+};
+
+function AllowanceTab({ corporateId }) {
+  const [period, setPeriod] = useState('monthly');
+  const [month, setMonth] = useState(thisMonth());
+  const [week, setWeek] = useState(isoWeekKey());
+  const [rows, setRows] = useState(null);
+  const periodKey = period === 'weekly' ? week : month;
+
+  useEffect(() => {
+    let alive = true;
+    corporateAdminService
+      .allowance(corporateId, { periodKey })
+      .then((data) => { if (alive) setRows(Array.isArray(data) ? data : data?.results || data?.items || []); })
+      .catch((error) => { if (alive) { toast.error(errorText(error)); setRows([]); } });
+    return () => { alive = false; };
+  }, [corporateId, periodKey]);
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-wrap items-end gap-3">
+        <Field label="Period type">
+          <select className={inputClass} value={period} onChange={(e) => { setPeriod(e.target.value); setRows(null); }}>
+            <option value="monthly">Monthly allowances</option>
+            <option value="weekly">Weekly allowances</option>
+          </select>
+        </Field>
+        {period === 'weekly'
+          ? <Field label="Week"><input type="week" className={inputClass} value={week} onChange={(e) => { if (e.target.value) { setWeek(e.target.value); setRows(null); } }} /></Field>
+          : <Field label="Month"><input type="month" className={inputClass} value={month} onChange={(e) => { if (e.target.value) { setMonth(e.target.value); setRows(null); } }} /></Field>}
+        <p className="text-xs text-gray-500">Each employee's km usage for <span className="font-mono">{periodKey}</span>. Only roles with an allowance on a {period === 'weekly' ? 'weekly' : 'monthly'} period have usage here.</p>
+      </div>
+      {!rows ? <Loader2 className="animate-spin text-gray-400" /> : !rows.length ? (
+        <p className="text-sm text-gray-500">No allowance usage for this period.</p>
+      ) : (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-600">
+              <tr>
+                <th className="text-left font-medium px-4 py-3">Employee</th>
+                <th className="text-left font-medium px-4 py-3">Role</th>
+                <th className="text-right font-medium px-4 py-3">Allowance</th>
+                <th className="text-right font-medium px-4 py-3">Used</th>
+                <th className="text-right font-medium px-4 py-3">Reserved</th>
+                <th className="text-right font-medium px-4 py-3">Remaining</th>
+                <th className="text-right font-medium px-4 py-3">Trips</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const remaining = row.remainingKm ?? Math.max(0, (row.allowanceKm || 0) - (row.usedKm || 0) - (row.reservedKm || 0));
+                return (
+                  <tr key={row.employeeId || row._id} className="border-t border-gray-100">
+                    <td className="px-4 py-3"><p className="font-medium">{row.name || row.employee?.name || '-'}</p><p className="text-xs text-gray-500 font-mono">{row.employeeCode || row.employee?.employeeCode || ''}</p></td>
+                    <td className="px-4 py-3">{row.role?.name || row.roleName || '-'}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatKm(row.allowanceKm)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatKm(row.usedKm)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatKm(row.reservedKm)}</td>
+                    <td className={`px-4 py-3 text-right tabular-nums ${remaining <= 0 ? 'text-red-600 font-semibold' : ''}`}>{formatKm(remaining)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{row.rides || 0}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EmployeesTab({ corporateId }) {
+  const [rows, setRows] = useState(null);
+  const [roles, setRoles] = useState([]);
+  const [roleFilter, setRoleFilter] = useState('');
+  const [selected, setSelected] = useState([]);
+  const [changing, setChanging] = useState(false);
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => {
+    let alive = true;
+    corporateAdminService
+      .employees(corporateId, { limit: 200, ...(roleFilter ? { roleId: roleFilter } : {}) })
+      .then((data) => { if (alive) setRows(data.items || []); })
+      .catch((error) => { if (alive) { toast.error(errorText(error)); setRows([]); } });
+    corporateAdminService
+      .roles(corporateId)
+      .then((data) => { if (alive) setRoles([...(data?.results || [])].sort((a, b) => (b.level || 0) - (a.level || 0))); })
+      .catch(() => null);
+    return () => { alive = false; };
+  }, [corporateId, roleFilter, version]);
+
+  const ids = (rows || []).map((row) => row._id);
+  const all = ids.length > 0 && ids.every((rowId) => selected.includes(rowId));
+  const toggle = (rowId) => setSelected((previous) => (previous.includes(rowId) ? previous.filter((item) => item !== rowId) : [...previous, rowId]));
+
+  const assign = async (roleId) => {
+    try {
+      await corporateAdminService.assignRole(corporateId, roleId, selected);
+      toast.success('Role changed');
+      setSelected([]);
+      setChanging(false);
+      setVersion((value) => value + 1);
+    } catch (error) {
+      toast.error(errorText(error));
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <select className={`${inputClass} w-48`} value={roleFilter} onChange={(e) => { setRoleFilter(e.target.value); setSelected([]); setRows(null); }}>
+          <option value="">All roles</option>
+          {roles.map((role) => <option key={role._id || role.id} value={role._id || role.id}>{role.name}</option>)}
+        </select>
+        {selected.length > 0 && (
+          <>
+            <span className="text-sm text-gray-600">{selected.length} selected</span>
+            <button type="button" onClick={() => setChanging(true)} className="text-sm font-semibold bg-gray-900 text-white rounded-lg px-3 py-2">Change role</button>
+            <button type="button" onClick={() => setSelected([])} className="text-sm text-gray-500">Clear</button>
+          </>
+        )}
+      </div>
+      {!rows ? <Loader2 className="animate-spin text-gray-400" /> : !rows.length ? (
+        <p className="text-sm text-gray-500">No employees yet. The company adds them from its panel.</p>
+      ) : (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-600">
+              <tr>
+                <th className="px-4 py-3 text-left"><input type="checkbox" aria-label="Select all" checked={all} onChange={() => setSelected(all ? [] : ids)} /></th>
+                <th className="text-left font-medium px-4 py-3">Name</th>
+                <th className="text-left font-medium px-4 py-3">Phone</th>
+                <th className="text-left font-medium px-4 py-3">Role</th>
+                <th className="text-left font-medium px-4 py-3">Department</th>
+                <th className="text-right font-medium px-4 py-3">Km allowance</th>
+                <th className="text-right font-medium px-4 py-3">Monthly limit</th>
+                <th className="text-left font-medium px-4 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row._id} className="border-t border-gray-100">
+                  <td className="px-4 py-3"><input type="checkbox" aria-label={`Select ${row.name}`} checked={selected.includes(row._id)} onChange={() => toggle(row._id)} /></td>
+                  <td className="px-4 py-3"><p className="font-medium">{row.name}</p><p className="text-xs text-gray-500 font-mono">{row.employeeCode}</p></td>
+                  <td className="px-4 py-3">{row.phone}</td>
+                  <td className="px-4 py-3">{row.role?.name || '-'}</td>
+                  <td className="px-4 py-3">{row.departmentId?.name || 'Unassigned'}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {Number(row.allowance?.allowanceKm) > 0
+                      ? <span>{formatKm(row.allowance.usedKm)} / {formatKm(row.allowance.allowanceKm)}<span className="block text-xs text-gray-500">{formatKm(row.allowance.remainingKm)} left · {row.allowance.periodKey}</span></span>
+                      : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums">{row.monthlyLimit ? formatMoney(row.monthlyLimit) : '-'}</td>
+                  <td className="px-4 py-3">{row.active ? 'Active' : 'Deactivated'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <ChangeRoleModal open={changing} count={selected.length} roles={roles} onClose={() => setChanging(false)} onConfirm={assign} />
+    </div>
+  );
+}
+
+function AdminInvoiceDrawer({ invoiceId, onClose }) {
+  const [invoice, setInvoice] = useState(null);
+  useEffect(() => {
+    corporateAdminService.invoice(invoiceId).then(setInvoice).catch((error) => { toast.error(errorText(error)); onClose(); });
+  }, [invoiceId, onClose]);
+  return (
+    <Drawer open title={invoice?.invoiceNumber || 'Invoice'} subtitle={invoice?.periodKey} onClose={onClose}>
+      {!invoice ? <Loader2 className="animate-spin text-gray-400" /> : <InvoiceBreakdown invoice={invoice} />}
+    </Drawer>
+  );
+}
 
 const Stat = ({ label, value }) => (
   <div className="bg-white border border-gray-200 rounded-xl p-4">
@@ -30,6 +229,11 @@ function InvoicesTab({ corporateId, onChange }) {
   const [data, setData] = useState(null);
   const [month, setMonth] = useState(previousMonth());
   const [busy, setBusy] = useState('');
+  const [viewing, setViewing] = useState('');
+  const closeViewing = useCallback(() => setViewing(''), []);
+  const fileBase = (invoice) => invoice.invoiceNumber.replace(/\W+/g, '_');
+  const exportInvoice = (invoice, format) =>
+    corporateAdminService.exportInvoice(invoice._id, format, `${fileBase(invoice)}.${format}`).catch((error) => toast.error(errorText(error)));
 
   const load = useCallback(async () => {
     try {
@@ -101,7 +305,10 @@ function InvoicesTab({ corporateId, onChange }) {
                   <td className="px-4 py-3">{formatDate(invoice.dueDate)}</td>
                   <td className="px-4 py-3"><StatusPill value={invoice.status} /></td>
                   <td className="px-4 py-3 whitespace-nowrap text-right space-x-3 text-xs font-semibold">
-                    <button type="button" onClick={() => corporateAdminService.downloadInvoicePdf(invoice._id, `${invoice.invoiceNumber.replace(/\W+/g, '_')}.pdf`).catch((error) => toast.error(errorText(error)))} className="text-gray-700 inline-flex items-center gap-1"><Download size={12} /> PDF</button>
+                    <button type="button" onClick={() => setViewing(invoice._id)} className="text-gray-700">View</button>
+                    <button type="button" onClick={() => corporateAdminService.downloadInvoicePdf(invoice._id, `${fileBase(invoice)}.pdf`).catch((error) => toast.error(errorText(error)))} className="text-gray-700 inline-flex items-center gap-1"><Download size={12} /> PDF</button>
+                    <button type="button" onClick={() => exportInvoice(invoice, 'csv')} className="text-gray-700 inline-flex items-center gap-1"><Download size={12} /> CSV</button>
+                    <button type="button" onClick={() => exportInvoice(invoice, 'xlsx')} className="text-gray-700 inline-flex items-center gap-1"><Download size={12} /> XLSX</button>
                     {invoice.status === 'draft' && (
                       <>
                         <button type="button" disabled={Boolean(busy)} onClick={() => run(invoice._id, () => corporateAdminService.generateInvoice(corporateId, { from: invoice.periodFrom, to: invoice.periodTo, periodKey: invoice.periodKey }), 'Draft refreshed')} className="text-gray-700">Refresh</button>
@@ -125,6 +332,7 @@ function InvoicesTab({ corporateId, onChange }) {
           </table>
         </div>
       )}
+      {viewing && <AdminInvoiceDrawer invoiceId={viewing} onClose={closeViewing} />}
     </div>
   );
 }
@@ -160,12 +368,26 @@ export default function CorporateDetail() {
   const [tab, setTab] = useState('overview');
   const [detail, setDetail] = useState(null);
   const [terms, setTerms] = useState(null);
+  const [commercial, setCommercial] = useState(null);
+  const [travelZone, setTravelZone] = useState(null);
   const [saving, setSaving] = useState(false);
+  const vehicleTypes = useAdminVehicleTypes();
+
+  const rolesApi = useMemo(() => ({
+    list: () => corporateAdminService.roles(id),
+    create: (body) => corporateAdminService.createRole(id, body),
+    update: (roleId, body) => corporateAdminService.updateRole(id, roleId, body),
+    remove: (roleId, reassignToRoleId) => corporateAdminService.deleteRole(id, roleId, reassignToRoleId),
+    makeDefault: (roleId) => corporateAdminService.makeDefaultRole(id, roleId),
+    vehicleTypes: () => corporateAdminService.vehicleTypes(),
+  }), [id]);
 
   const load = useCallback(async () => {
     try {
       const data = await corporateAdminService.detail(id);
       setDetail(data);
+      setCommercial(commercialToForm(data.corporate));
+      setTravelZone(travelZoneToForm(data.corporate.travelZone));
       setTerms({
         creditLimit: data.corporate.creditLimit,
         paymentTermsDays: data.corporate.paymentTermsDays,
@@ -180,11 +402,10 @@ export default function CorporateDetail() {
   }, [id]);
   useEffect(() => { load(); }, [load]);
 
-  const employeesLoader = useCallback(() => corporateAdminService.employees(id, { limit: 200 }), [id]);
   const ledgerLoader = useCallback(() => corporateAdminService.ledger(id, { limit: 100 }), [id]);
   const tripsLoader = useCallback(() => corporateAdminService.trips(id, { limit: 100, from: new Date(Date.now() - 90 * 864e5).toISOString() }), [id]);
 
-  if (!detail || !terms) {
+  if (!detail || !terms || !commercial || !travelZone) {
     return <div className="flex items-center gap-2 text-gray-500 py-16 justify-center"><Loader2 size={18} className="animate-spin" /> Loading…</div>;
   }
 
@@ -235,9 +456,9 @@ export default function CorporateDetail() {
         <Stat label="Pending approvals" value={detail.pendingApprovals} />
       </div>
 
-      <div className="flex gap-2 mb-4 border-b border-gray-200">
+      <div className="flex gap-2 mb-4 border-b border-gray-200 overflow-x-auto">
         {TABS.map((item) => (
-          <button key={item} type="button" onClick={() => setTab(item)} className={`text-sm capitalize px-3 py-2 -mb-px border-b-2 ${tab === item ? 'border-gray-900 font-semibold text-gray-900' : 'border-transparent text-gray-500'}`}>{item}</button>
+          <button key={item} type="button" onClick={() => setTab(item)} className={`text-sm capitalize whitespace-nowrap px-3 py-2 -mb-px border-b-2 ${tab === item ? 'border-gray-900 font-semibold text-gray-900' : 'border-transparent text-gray-500'}`}>{item}</button>
         ))}
       </div>
 
@@ -253,6 +474,41 @@ export default function CorporateDetail() {
                 <button type="button" disabled={saving} onClick={() => act(() => corporateAdminService.update(id, termsPayload(terms)), 'Saved')} className="text-sm font-semibold bg-gray-900 text-white rounded-lg px-4 py-2">Save terms</button>
               )}
             </div>
+          </section>
+          <section className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
+            <h2 className="font-semibold text-gray-900">Billing, tariff and commission</h2>
+            <CommercialFields value={commercial} onChange={setCommercial} vehicleTypes={vehicleTypes} />
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => {
+                const problem = validateCommercial(commercial);
+                if (problem) toast.error(problem);
+                else act(() => corporateAdminService.update(id, commercialPayload(commercial)), 'Saved');
+              }}
+              className="text-sm font-semibold bg-gray-900 text-white rounded-lg px-4 py-2 disabled:opacity-50"
+            >
+              Save billing &amp; tariff
+            </button>
+          </section>
+          <section className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
+            <div>
+              <h2 className="font-semibold text-gray-900">Travel zone</h2>
+              <p className="text-xs text-gray-500 mt-0.5">The company can also change this from its panel.</p>
+            </div>
+            <TravelZoneEditor value={travelZone} onChange={setTravelZone} />
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => {
+                const problem = validateTravelZone(travelZone);
+                if (problem) toast.error(problem);
+                else act(() => corporateAdminService.update(id, { travelZone: travelZoneToBody(travelZone) }), 'Travel zone saved');
+              }}
+              className="text-sm font-semibold bg-gray-900 text-white rounded-lg px-4 py-2 disabled:opacity-50"
+            >
+              Save travel zone
+            </button>
           </section>
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="bg-white border border-gray-200 rounded-xl p-5 text-sm space-y-1">
@@ -274,19 +530,16 @@ export default function CorporateDetail() {
         </div>
       )}
 
-      {tab === 'employees' && (
-        <ListTab
-          loader={employeesLoader}
-          empty="No employees yet. The company adds them from its panel."
-          columns={[
-            { label: 'Name', render: (row) => <><p className="font-medium">{row.name}</p><p className="text-xs text-gray-500">{row.employeeCode}</p></> },
-            { label: 'Phone', render: (row) => row.phone },
-            { label: 'Department', render: (row) => row.departmentId?.name || 'Unassigned' },
-            { label: 'Monthly limit', right: true, render: (row) => (row.monthlyLimit ? formatMoney(row.monthlyLimit) : '-') },
-            { label: 'Status', render: (row) => (row.active ? 'Active' : 'Deactivated') },
-          ]}
-        />
+      {tab === 'employees' && <EmployeesTab corporateId={id} />}
+
+      {tab === 'roles' && (
+        <div className="space-y-2">
+          <p className="text-sm text-gray-500">Roles set each group's free km allowance and travel rules. The company manages the same list from its panel.</p>
+          <RolesManager api={rolesApi} canManage />
+        </div>
       )}
+
+      {tab === 'allowance' && <AllowanceTab corporateId={id} />}
 
       {tab === 'invoices' && <InvoicesTab corporateId={id} onChange={load} />}
 

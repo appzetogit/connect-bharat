@@ -4,7 +4,7 @@ import { Loader2, X } from 'lucide-react';
 /** Small shared pieces for the corporate panel pages. */
 
 export const formatMoney = (value) =>
-  `₹${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  `₹${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export const formatDate = (value, withTime = false) => {
   if (!value) return '-';
@@ -121,6 +121,11 @@ const BADGE_STYLES = {
   expired: 'bg-gray-100 text-gray-600',
   void: 'bg-gray-100 text-gray-600',
   draft: 'bg-gray-100 text-gray-600',
+  scheduled: 'bg-blue-100 text-blue-800',
+  started: 'bg-blue-100 text-blue-800',
+  arrived: 'bg-blue-100 text-blue-800',
+  company_tariff: 'bg-violet-100 text-violet-800',
+  not_required: 'bg-gray-100 text-gray-600',
 };
 
 export const Badge = ({ value }) => (
@@ -175,11 +180,11 @@ export const Table = ({ columns, rows, rowKey = (row) => row._id || row.id }) =>
   </Card>
 );
 
-export const Modal = ({ open, title, onClose, children, footer }) => {
+export const Modal = ({ open, title, onClose, children, footer, wide = false }) => {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-xl" onClick={(event) => event.stopPropagation()}>
+      <div className={`bg-white rounded-xl w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} max-h-[90vh] overflow-y-auto shadow-xl`} onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">{title}</h2>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-700" aria-label="Close">
@@ -188,6 +193,27 @@ export const Modal = ({ open, title, onClose, children, footer }) => {
         </div>
         <div className="p-5 space-y-4">{children}</div>
         {footer && <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">{footer}</div>}
+      </div>
+    </div>
+  );
+};
+
+/** Right-hand side panel for details that need more room than a modal. */
+export const Drawer = ({ open, title, subtitle, onClose, children }) => {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
+      <div className="bg-white w-full max-w-4xl h-full overflow-y-auto shadow-xl" onClick={(event) => event.stopPropagation()}>
+        <div className="sticky top-0 bg-white flex items-start justify-between gap-3 px-5 py-4 border-b border-gray-100">
+          <div className="min-w-0">
+            <h2 className="font-semibold text-gray-900 truncate">{title}</h2>
+            {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
+          </div>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-700" aria-label="Close">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="p-5 space-y-4">{children}</div>
       </div>
     </div>
   );
