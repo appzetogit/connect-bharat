@@ -14,6 +14,7 @@ import {
   RIDE_STATUS,
 } from '../constants/index.js';
 import { Delivery } from '../user/models/Delivery.js';
+import { isRideAwaitingAdvance } from '../outstation/services/advanceGate.js';
 import { getRideRoom, resolveSetPriceForRide } from './rideService.js';
 import { SOCKET_EVENTS } from '../socket/events.js';
 import { resolveTransportDispatchConfig } from './transportSettingsService.js';
@@ -1440,6 +1441,9 @@ export const startDispatchFlow = async (ride, { forceRestart = false } = {}) => 
   if (!forceRestart && hasLocalDispatchFlow(ride._id)) {
     return;
   }
+
+  // An outstation ride whose advance is unpaid waits; paying it starts dispatch.
+  if (await isRideAwaitingAdvance(ride)) return;
 
   stopDispatchFlow(ride._id, { releaseLease: false });
 

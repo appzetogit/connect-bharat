@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { RIDE_LIVE_STATUS, RIDE_STATUS } from '../../constants/index.js';
+import { outstationIntercityFields, outstationRideFields } from '../../outstation/models/outstationRideFields.js';
 
 const rideMessageSchema = new mongoose.Schema(
   {
@@ -149,6 +150,7 @@ const rideSchema = new mongoose.Schema(
         default: '',
         trim: true,
       },
+      ...outstationIntercityFields,
     },
     parcel: {
       category: {
@@ -599,6 +601,7 @@ const rideSchema = new mongoose.Schema(
         default: null,
       },
     },
+    ...outstationRideFields,
     commissionAmount: {
       type: Number,
       default: 0,

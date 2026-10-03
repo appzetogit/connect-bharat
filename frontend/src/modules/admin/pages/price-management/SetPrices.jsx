@@ -1019,6 +1019,19 @@ const SetPrices = ({ mode }) => {
                            <div className="flex-1"><label className={labelClass}>Out. Price/Dist</label><input type="number" className={inputClass + " py-1"} value={formData.outstation_price_per_distance} onChange={e => setFormData(p=>({...p, outstation_price_per_distance: e.target.value}))} /></div>
                         </div>
                      )}
+
+                     {/* Outstation round trip / multi-day terms and the mandatory advance (backend: outstation/services/outstationFare.js) */}
+                     {formData.enable_outstation_ride && (
+                        <div className="col-span-1 sm:col-span-2 md:col-span-4 lg:col-span-6 flex flex-wrap gap-2">
+                           <div className="flex-1 min-w-[110px]"><label className={labelClass}>Min Km / Day</label><input type="number" min="0" className={inputClass + " py-1"} value={formData.outstation_min_km_per_day ?? ''} onChange={e => setFormData(p=>({...p, outstation_min_km_per_day: e.target.value === '' ? '' : String(Math.max(0, Number(e.target.value)))}))} /></div>
+                           <div className="flex-1 min-w-[110px]"><label className={labelClass}>Driver Allowance / Day</label><input type="number" min="0" className={inputClass + " py-1"} value={formData.outstation_driver_allowance_per_day ?? ''} onChange={e => setFormData(p=>({...p, outstation_driver_allowance_per_day: e.target.value === '' ? '' : String(Math.max(0, Number(e.target.value)))}))} /></div>
+                           <div className="flex-1 min-w-[110px]"><label className={labelClass}>Night Allowance / Night</label><input type="number" min="0" className={inputClass + " py-1"} value={formData.outstation_night_allowance_per_night ?? ''} onChange={e => setFormData(p=>({...p, outstation_night_allowance_per_night: e.target.value === '' ? '' : String(Math.max(0, Number(e.target.value)))}))} /></div>
+                           <div className="flex-1 min-w-[110px]"><label className={labelClass}>Advance Type</label><select className={inputClass + " py-1"} value={formData.outstation_advance_type || 'none'} onChange={e => setFormData(p=>({...p, outstation_advance_type: e.target.value}))}><option value="none">No advance</option><option value="percentage">% of fare</option><option value="fixed">Fixed amount</option></select></div>
+                           {(formData.outstation_advance_type || 'none') !== 'none' && (
+                              <div className="flex-1 min-w-[110px]"><label className={labelClass}>Advance {formData.outstation_advance_type === 'percentage' ? '(%)' : '(Amount)'}</label><input type="number" min="0" max={formData.outstation_advance_type === 'percentage' ? 100 : undefined} className={inputClass + " py-1"} value={formData.outstation_advance_value ?? ''} onChange={e => setFormData(p=>({...p, outstation_advance_value: e.target.value === '' ? '' : String(Math.max(0, Number(e.target.value)))}))} /></div>
+                           )}
+                        </div>
+                     )}
                   </div>
 
                   {/* Section: Cancellation Fee */}

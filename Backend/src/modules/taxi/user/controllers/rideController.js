@@ -36,6 +36,7 @@ import { getTipSettings } from '../../services/appSettingsService.js';
 import { getBidRideSettings, getTransportRideSettings } from '../../services/transportSettingsService.js';
 import { matchDrivers } from '../../services/matchingService.js';
 import { Ride } from '../models/Ride.js';
+import { advancePaidAmount } from '../../outstation/services/outstationFare.js';
 import { UserWallet } from '../models/UserWallet.js';
 
 const EARTH_RADIUS_METERS = 6371000;
@@ -101,7 +102,8 @@ const isDriverCollectionPaid = (ride = {}) =>
 const buildCompletionAmounts = (ride, tipAmount = 0) => {
   const fare = roundMoney(ride?.fare || 0);
   const normalizedTipAmount = roundMoney(tipAmount || 0);
-  const fareDue = isDriverCollectionPaid(ride) ? 0 : fare;
+  // An outstation advance paid at booking is not asked for again.
+  const fareDue = isDriverCollectionPaid(ride) ? 0 : Math.max(0, roundMoney(fare - advancePaidAmount(ride)));
   return {
     fare,
     fareDue,
@@ -188,7 +190,7 @@ const finalizeRideCompletion = async ({
   const { fare, fareDue, totalCharge } = buildCompletionAmounts(ride, tipAmount);
   const previousPaymentMethod = String(ride.paymentMethod || 'cash').trim().toLowerCase() === 'cash' ? 'cash' : 'online';
   const driverCreditAmount = roundMoney(
-    tipAmount + (fareDue > 0 && previousPaymentMethod === 'cash' ? fare : 0),
+    tipAmount + (fareDue > 0 && previousPaymentMethod === 'cash' ? fareDue : 0),
   );
 
   let walletResult = null;
@@ -205,7 +207,7 @@ const finalizeRideCompletion = async ({
         source: paymentSource || 'ride_completion',
         rideId: String(ride._id),
         userId: String(userId),
-        farePortion: fareDue > 0 ? fare : 0,
+        farePortion: fareDue > 0 ? fareDue : 0,
         tipAmount,
         totalCharge,
         provider: paymentRecord?.provider || '',
@@ -278,7 +280,7 @@ const resolveRazorpayCredentials = async () => {
   return resolveConfiguredGatewayCredentials('razor_pay');
 };
 
-const razorpayRequest = async ({ method, path, body, keyId, keySecret }) => {
+export const razorpayRequest = async ({ method, path, body, keyId, keySecret }) => {
   const response = await fetch(`https://api.razorpay.com/v1${path}`, {
     method,
     headers: {

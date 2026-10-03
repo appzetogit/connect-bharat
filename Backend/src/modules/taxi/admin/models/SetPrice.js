@@ -222,6 +222,36 @@ const setPriceSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    // Outstation round trip / multi-day terms (outstation/services/outstationFare.js).
+    // A car held for a day bills at least this many km per day; 0 = no floor.
+    outstation_min_km_per_day: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    // The driver's daily and overnight allowance, passed through untaxed.
+    outstation_driver_allowance_per_day: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    outstation_night_allowance_per_night: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    // Advance an outstation rider pays before dispatch starts: 'none', a
+    // 'percentage' of the fare, or a 'fixed' sum.
+    outstation_advance_type: {
+      type: String,
+      enum: ['none', 'percentage', 'fixed'],
+      default: 'none',
+    },
+    outstation_advance_value: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     free_waiting_before: {
       type: Number,
       default: null,
