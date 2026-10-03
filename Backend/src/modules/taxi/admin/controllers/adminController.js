@@ -386,7 +386,7 @@ export const deleteAdminAccount = asyncHandler(async (req, res) => {
 });
 
 export const getUsers = asyncHandler(async (req, res) =>
-  ok(res, await adminService.listUsers(req.query)),
+  ok(res, await adminService.listUsers({ ...req.query, adminScope: req.adminScope })),
 );
 export const getEmployees = asyncHandler(async (req, res) =>
   ok(res, await adminService.listEmployees(req.query, req.auth?.admin)),
@@ -789,8 +789,8 @@ export const deleteOwnerBooking = asyncHandler(async (req, res) => {
   ok(res, { deleted: true });
 });
 
-export const getDashboardData = asyncHandler(async (_req, res) =>
-  ok(res, await adminService.getDashboardData()),
+export const getDashboardData = asyncHandler(async (req, res) =>
+  ok(res, await adminService.getDashboardData({ adminScope: req.adminScope })),
 );
 export const getOwnerDashboardData = asyncHandler(async (_req, res) =>
   ok(res, await adminService.getOwnerDashboardData()),

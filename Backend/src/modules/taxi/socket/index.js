@@ -123,6 +123,10 @@ const onAsync = (socket, handler) => async (payload = {}) => {
   } catch (error) {
     socket.emit('errorMessage', {
       message: error.message || 'Socket operation failed',
+      // Machine-readable extras (e.g. `details.code: 'start_otp_mismatch'`)
+      // so apps can react without parsing the message.
+      ...(error.statusCode ? { statusCode: error.statusCode } : {}),
+      ...(error.details ? { details: error.details } : {}),
     });
   }
 };

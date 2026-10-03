@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import { RIDE_LIVE_STATUS, RIDE_STATUS } from '../../constants/index.js';
 
@@ -393,6 +394,32 @@ const rideSchema = new mongoose.Schema(
       minlength: 4,
       maxlength: 4,
     },
+    /// Parcel receiver's delivery OTP (see services/tripOtpService.js).
+    /// `select: false` so no serializer that loads a ride can hand it to the
+    /// driver; only the booking user reads it, through its own endpoint.
+    parcelDropOtp: {
+      type: String,
+      trim: true,
+      default: '',
+      select: false,
+    },
+    parcelDropOtpSentAt: {
+      type: Date,
+      default: null,
+    },
+    /// Wrong-OTP counters and lockouts, one per stage.
+    otpGuard: {
+      start: {
+        failedAttempts: { type: Number, default: 0 },
+        lockedUntil: { type: Date, default: null },
+        verifiedAt: { type: Date, default: null },
+      },
+      drop: {
+        failedAttempts: { type: Number, default: 0 },
+        lockedUntil: { type: Date, default: null },
+        verifiedAt: { type: Date, default: null },
+      },
+    },
     driverPaymentCollection: {
       provider: {
         type: String,
@@ -744,5 +771,12 @@ rideSchema.index({ userId: 1, createdAt: -1 });
 rideSchema.index({ driverId: 1, createdAt: -1 });
 rideSchema.index({ status: 1, liveStatus: 1, scheduledAt: 1, createdAt: -1 });
 rideSchema.index({ driverId: 1, scheduledAt: 1, status: 1, liveStatus: 1 });
+
+/// Every parcel gets its receiver OTP at booking, whichever path creates it.
+rideSchema.pre('validate', function assignParcelDropOtp() {
+  if (this.isNew && this.serviceType === 'parcel' && !this.parcelDropOtp) {
+    this.parcelDropOtp = String(crypto.randomInt(1000, 10000));
+  }
+});
 
 export const Ride = mongoose.models.TaxiRide || mongoose.model('TaxiRide', rideSchema);

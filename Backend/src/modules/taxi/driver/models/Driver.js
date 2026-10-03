@@ -579,5 +579,23 @@ driverSchema.index({ acquiredByEmployeeCode: 1 });
 driverSchema.index({ location: '2dsphere' });
 driverSchema.index({ 'routeBooking.anchorLocation': '2dsphere' });
 
+/// `approve` still defaults to true so existing drivers and every caller that
+/// relies on auto-approval behave exactly as before. When the admin turns on
+/// `customization.require_driver_approval`, a NEW driver created without an
+/// explicit `approve` starts pending instead. Callers that pass `approve`
+/// themselves (onboarding already passes false, admin create passes its own
+/// choice) are left alone.
+driverSchema.pre('validate', async function applyDriverApprovalPolicy() {
+  if (!this.isNew || !this.$isDefault('approve')) return;
+
+  const { isCustomizationFlagOn } = await import('../../services/securitySettingsService.js');
+  if (!(await isCustomizationFlagOn('require_driver_approval'))) return;
+
+  this.approve = false;
+  if (this.$isDefault('status')) {
+    this.status = 'pending';
+  }
+});
+
 export const Driver = mongoose.models.TaxiDriver || mongoose.model('TaxiDriver', driverSchema);
 

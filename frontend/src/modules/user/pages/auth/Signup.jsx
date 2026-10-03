@@ -154,7 +154,8 @@ const Signup = () => {
 
     try {
       const dataUrl = await imageFileToUploadDataUrl(file, { maxSize: 900, quality: 0.84 });
-      const uploadPayload = await uploadService.uploadImage(dataUrl, 'user-profile');
+      // No token yet at signup: the verified signup phone stands in for one.
+      const uploadPayload = await uploadService.uploadImage(dataUrl, 'user-profile', { signupPhone: formData.phone });
       const secureUrl = extractUploadUrl(uploadPayload);
 
       if (!secureUrl) {

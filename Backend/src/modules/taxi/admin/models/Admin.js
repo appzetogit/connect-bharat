@@ -38,6 +38,15 @@ const adminSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    /// Optional AdminRole whose permissions are merged with `permissions`
+    /// on every request (middlewares/adminPermissionMiddleware.js). A `role`
+    /// string equal to an AdminRole slug works too, for admins created before
+    /// this field existed.
+    role_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'TaxiAdminRole',
+      default: null,
+    },
     service_location_ids: {
       type: [
         {

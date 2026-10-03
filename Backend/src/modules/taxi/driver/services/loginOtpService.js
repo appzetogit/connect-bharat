@@ -513,6 +513,12 @@ export const verifyDriverLoginOtp = async ({ phone, otp, role }) => {
     );
   }
 
+  // Pending accounts may still sign in (to see their registration status);
+  // blocked drivers may not, or they'd get a token authenticate() then rejects.
+  if (normalizedRole === 'driver' && String(account.status || '').toLowerCase() === 'blocked') {
+    throw new ApiError(403, 'Driver account is blocked');
+  }
+
   // Allow verification even if account is pending approval
   // if (
   //   (normalizedRole === 'owner' && !isApprovedOwner(account)) ||

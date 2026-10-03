@@ -42,7 +42,15 @@ export const createDefaultBusinessSettings = () => ({
     enable_multiple_ride_feature: '1',
     enable_max_dist_feature: '1',
     enable_fixed_fare: '1',
-    
+
+    // Security gates (services/securitySettingsService.js). Off = today's
+    // behaviour; require_upload_auth is the one that defaults secure.
+    enable_ride_start_otp_verification: '0',
+    enforce_delivery_otp: '0',
+    require_driver_approval: '0',
+    strict_admin_permissions: '0',
+    require_upload_auth: '1',
+
     // Sign-in Toggles
     user_email_login: '1',
     user_email_otp: '1',
