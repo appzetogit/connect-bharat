@@ -278,3 +278,50 @@ Every per-company field defaults off (`allowance.enabled: false`,
 `tariff.enabled: false`, `driverCommission.enabled: false`,
 `travelZone.mode: 'free_roaming'`), so nothing changes for an existing
 company until someone sets it.
+
+---
+
+## 5. Web UI assumptions (shapes the panels read; backend please match)
+
+Added by the web-UI change. No new endpoints beyond the dynamic-roles ones;
+these pin down response shapes §3 left open.
+
+- **Role delete / bulk assign** (dynamic-roles clarification):
+  `DELETE /roles/:roleId?reassignToRoleId=<id>` and
+  `POST /roles/:roleId/assign { employeeIds: [...] }`, and the same under
+  `/admin/corporates/:id/roles/...`. The UI shows a "move employees to…" picker
+  when `employeeCount > 0` or on a 409; the default role's Delete is disabled
+  (make another role default first). Role names/codes are never hardcoded in
+  the UI; every dropdown comes from `GET /roles`.
+- **`GET /bookings`** → `{ items, total, page, limit }` (same paging as
+  `/trips`), each item:
+  `{ rideId, status, serviceType, employee: { id, name, employeeCode }, pickupAddress, dropAddress, vehicleName, scheduledAt, createdAt, fare, split: { companyAmount, employeeAmount, employeePaymentMethod, employeePaymentStatus }, allowance, bookedBy: { id, name } }`.
+  Query: `page, limit, status, employeeId, from, to` (ISO).
+- **`POST /bookings/:rideId/cancel`** body `{ reason? }`.
+- **`POST /bookings/quote`**: each quote's `allowance` is
+  `{ periodKey, allowanceKm, remainingKmAtBooking, estimatedKm, coveredKm, excessKm }`,
+  `split` is `{ companyAmount, employeeAmount }`, `withinBoundary` a boolean
+  (an out-of-boundary quote may come back with `false` or as the 403; both are
+  handled). The 403 body carries `code: 'corporate_outside_boundary'` and
+  `offices: [{ name, address, radiusKm }]` at the top level.
+- **`GET /employees/:id/allowance`**: `current` and `history[]` are
+  `CorporateAllowanceUsage` rows plus `remainingKm` (UI computes it if absent).
+- **`GET /admin/corporates/:id/allowance?periodKey=`** →
+  `{ periodKey, results: [{ employeeId, name, employeeCode, role: { id, name, code }, period, allowanceKm, usedKm, reservedKm, remainingKm, rides }] }`.
+  `periodKey` is `YYYY-MM` or ISO week `YYYY-Www` (what `<input type="week">` yields).
+- **`GET /admin/corporates/:id/employees`** rows gain the same `role` and
+  `allowance` as the panel list, and accept the `roleId` filter.
+- **Invoice detail** (`GET /corporate/invoices/:id`, `GET /admin/corporates/invoices/:invoiceId`):
+  `byRole` and `byEmployee` sit at the top level of the invoice (next to
+  `lines`); byRole rows `{ roleId, roleName, trips, km, coveredKm, excessKm, billedAmount }`
+  (byEmployee: `employeeId, employeeName, employeeCode` instead of the role
+  keys). The UI also reads `summary.byRole` as a fallback.
+- **Exports**: `GET .../invoices/:id/export.csv` / `.xlsx` as a file download.
+- **Vehicle types**: the panel's role picker uses the existing public
+  `GET /users/vehicle-types` (`{ results: [{ _id, name }] }`); admin uses
+  `GET /admin/types/vehicle-types/list`. No new endpoint.
+- **Excess payment methods in the panel** are read from `GET /corporate/me` →
+  `corporate.excessPayment.allowedMethods` (that route already returns the
+  full corporate document).
+- **Employee import** accepts a `roleCode` column (role name also accepted);
+  a blank Employee Code means auto-generate.

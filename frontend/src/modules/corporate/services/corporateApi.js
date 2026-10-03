@@ -105,6 +105,27 @@ export const corporateApi = {
   deactivateEmployee: (id) => unwrap(client.post(`/corporate/employees/${id}/deactivate`)),
   inviteEmployee: (id) => unwrap(client.post(`/corporate/employees/${id}/invite`)),
   importEmployees: (body) => unwrap(client.post('/corporate/employees/import', body)),
+  employeeAllowance: (id, periods = 6) => unwrap(client.get(`/corporate/employees/${id}/allowance`, { params: { periods } })),
+
+  roles: () => unwrap(client.get('/corporate/roles')),
+  createRole: (body) => unwrap(client.post('/corporate/roles', body)),
+  updateRole: (id, body) => unwrap(client.patch(`/corporate/roles/${id}`, body)),
+  /// reassignToRoleId moves the role's employees first; without it the backend refuses (409) a role still in use.
+  deleteRole: (id, reassignToRoleId) =>
+    unwrap(client.delete(`/corporate/roles/${id}`, { params: reassignToRoleId ? { reassignToRoleId } : {} })),
+  assignRole: (roleId, employeeIds) => unwrap(client.post(`/corporate/roles/${roleId}/assign`, { employeeIds })),
+  makeDefaultRole: (id) => unwrap(client.post(`/corporate/roles/${id}/make-default`)),
+
+  travelZone: () => unwrap(client.get('/corporate/travel-zone')),
+  saveTravelZone: (body) => unwrap(client.put('/corporate/travel-zone', body)),
+
+  quoteBooking: (body) => unwrap(client.post('/corporate/bookings/quote', body)),
+  createBooking: (body) => unwrap(client.post('/corporate/bookings', body)),
+  bookings: (params) => unwrap(client.get('/corporate/bookings', { params })),
+  cancelBooking: (rideId, reason) => unwrap(client.post(`/corporate/bookings/${rideId}/cancel`, { reason })),
+
+  /// Public vehicle catalogue (no auth needed), for the role vehicle pickers.
+  vehicleTypes: () => unwrap(client.get('/users/vehicle-types')),
 
   departments: () => unwrap(client.get('/corporate/departments')),
   createDepartment: (body) => unwrap(client.post('/corporate/departments', body)),

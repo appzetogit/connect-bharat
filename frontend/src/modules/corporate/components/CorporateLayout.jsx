@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Navigate, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
+  BadgeCheck,
   BarChart3,
   Building2,
+  CarFront,
   CheckSquare,
   FileText,
   LayoutDashboard,
   LogOut,
+  MapPinned,
   Menu,
   Route as RouteIcon,
   ShieldCheck,
@@ -25,11 +28,14 @@ import {
 /** Which panel roles see which sections. Mirrors the backend route guards. */
 const NAV = [
   { to: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['owner', 'admin', 'approver', 'finance'] },
+  { to: 'travel-desk', label: 'Travel Desk', icon: CarFront, roles: ['owner', 'admin', 'approver', 'finance'] },
   { to: 'approvals', label: 'Approvals', icon: CheckSquare, roles: ['owner', 'admin', 'approver'] },
   { to: 'trips', label: 'Trips', icon: RouteIcon, roles: ['owner', 'admin', 'approver', 'finance'] },
   { to: 'employees', label: 'Employees', icon: Users, roles: ['owner', 'admin', 'approver', 'finance'] },
+  { to: 'roles', label: 'Roles', icon: BadgeCheck, roles: ['owner', 'admin', 'approver', 'finance'] },
   { to: 'departments', label: 'Departments', icon: Building2, roles: ['owner', 'admin', 'approver', 'finance'] },
   { to: 'policies', label: 'Travel Policies', icon: ShieldCheck, roles: ['owner', 'admin', 'approver', 'finance'] },
+  { to: 'travel-zone', label: 'Travel Zone', icon: MapPinned, roles: ['owner', 'admin', 'approver', 'finance'] },
   { to: 'invoices', label: 'Invoices', icon: FileText, roles: ['owner', 'admin', 'finance'] },
   { to: 'reports', label: 'Reports', icon: BarChart3, roles: ['owner', 'admin', 'approver', 'finance'] },
   { to: 'users', label: 'Panel Users', icon: UserCog, roles: ['owner', 'admin'] },

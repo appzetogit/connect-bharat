@@ -36,20 +36,35 @@ export const corporateAdminService = {
   recordPayment: (invoiceId, body) => unwrap(api.post(`${base}/invoices/${invoiceId}/payments`, body)),
   voidInvoice: (invoiceId, reason) => unwrap(api.post(`${base}/invoices/${invoiceId}/void`, { reason })),
   paymentLink: (invoiceId) => unwrap(api.post(`${base}/invoices/${invoiceId}/payment-link`)),
+  invoice: (invoiceId) => unwrap(api.get(`${base}/invoices/${invoiceId}`)),
+  roles: (id) => unwrap(api.get(`${base}/${id}/roles`)),
+  createRole: (id, body) => unwrap(api.post(`${base}/${id}/roles`, body)),
+  updateRole: (id, roleId, body) => unwrap(api.patch(`${base}/${id}/roles/${roleId}`, body)),
+  deleteRole: (id, roleId, reassignToRoleId) =>
+    unwrap(api.delete(`${base}/${id}/roles/${roleId}`, { params: reassignToRoleId ? { reassignToRoleId } : {} })),
+  assignRole: (id, roleId, employeeIds) => unwrap(api.post(`${base}/${id}/roles/${roleId}/assign`, { employeeIds })),
+  makeDefaultRole: (id, roleId) => unwrap(api.post(`${base}/${id}/roles/${roleId}/make-default`)),
+  allowance: (id, params) => unwrap(api.get(`${base}/${id}/allowance`, { params })),
+  /// The admin vehicle-type listing, for the tariff rows and role vehicle pickers.
+  vehicleTypes: () => unwrap(api.get('/admin/types/vehicle-types/list')),
   aging: (params) => unwrap(api.get(`${base}/aging`, { params })),
   settings: () => unwrap(api.get(`${base}/settings`)),
   saveSettings: (body) => unwrap(api.patch(`${base}/settings`, body)),
-  downloadInvoicePdf: async (invoiceId, filename) => {
-    const response = await api.get(`${base}/invoices/${invoiceId}/pdf`, { responseType: 'blob' });
-    // The shared client's interceptor resolves to the body itself, a Blob here.
-    const blob = response instanceof Blob ? response : response?.data;
-    const href = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = href;
-    link.download = filename;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(href), 1000);
-  },
+  downloadInvoicePdf: (invoiceId, filename) => downloadBlob(`${base}/invoices/${invoiceId}/pdf`, filename),
+  /// The per-trip annex; format is 'csv' or 'xlsx'.
+  exportInvoice: (invoiceId, format, filename) => downloadBlob(`${base}/invoices/${invoiceId}/export.${format}`, filename),
 };
+
+async function downloadBlob(url, filename) {
+  const response = await api.get(url, { responseType: 'blob' });
+  // The shared client's interceptor resolves to the body itself, a Blob here.
+  const blob = response instanceof Blob ? response : response?.data;
+  const href = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = href;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(href), 1000);
+}
 
 export const errorText = (error, fallback = 'Something went wrong') => error?.response?.data?.message || error?.message || fallback;

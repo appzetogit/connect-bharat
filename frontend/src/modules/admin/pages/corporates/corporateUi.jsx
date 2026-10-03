@@ -1,7 +1,7 @@
 /** Shared bits for the admin corporate pages. */
 
 export const formatMoney = (value) =>
-  `₹${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+  `₹${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export const formatDate = (value) => {
   if (!value) return '-';

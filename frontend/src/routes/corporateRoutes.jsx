@@ -17,6 +17,9 @@ const CorporateTrips = lazy(() => import('../modules/corporate/pages/Trips'));
 const CorporateInvoices = lazy(() => import('../modules/corporate/pages/Invoices'));
 const CorporateReports = lazy(() => import('../modules/corporate/pages/Reports'));
 const CorporateUsers = lazy(() => import('../modules/corporate/pages/Users'));
+const CorporateRoles = lazy(() => import('../modules/corporate/pages/Roles'));
+const CorporateTravelZone = lazy(() => import('../modules/corporate/pages/TravelZone'));
+const CorporateTravelDesk = lazy(() => import('../modules/corporate/pages/TravelDesk'));
 
 const corporateRoutes = (
   <>
@@ -33,6 +36,9 @@ const corporateRoutes = (
       <Route path="invoices" element={<CorporateInvoices />} />
       <Route path="reports" element={<CorporateReports />} />
       <Route path="users" element={<CorporateUsers />} />
+      <Route path="roles" element={<CorporateRoles />} />
+      <Route path="travel-zone" element={<CorporateTravelZone />} />
+      <Route path="travel-desk" element={<CorporateTravelDesk />} />
       <Route path="*" element={<Navigate to="/corporate-panel/dashboard" replace />} />
     </Route>
   </>
