@@ -103,6 +103,7 @@ import {
   AdminReferralDashboard,
   AdminReferralTranslation,
   AdminRentalBookingRequests,
+  AdminRentalOperations,
   AdminRentalCommissionManager,
   AdminRentalPackageTypes,
   AdminRentalQuoteRequests,
@@ -350,6 +351,7 @@ const adminRoutes = (
         <Route path="rental-tracking" element={<AdminRentalTracking />} />
         <Route path="rental-tracking/:id" element={<AdminRentalTrackingDetail />} />
         <Route path="rental-requests" element={<AdminRentalBookingRequests />} />
+        <Route path="rental-operations" element={<AdminRentalOperations />} />
         <Route path="rental-quotes" element={<AdminRentalQuoteRequests />} />
         <Route path="rental-packages" element={<AdminRentalPackageTypes />} />
         <Route path="rental-packages/create" element={<AdminRentalPackageTypes mode="create" />} />

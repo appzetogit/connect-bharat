@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { computeRentalBillingMetrics } from '../../rental/services/rentalBilling.js';
 
 const rentalTrackingHistorySchema = new mongoose.Schema(
   {
@@ -210,6 +211,34 @@ const rentalBookingRequestSchema = new mongoose.Schema(
         min: 0,
       },
       extraHourPrice: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      /// Snapshotted at creation so a later admin edit of the vehicle's
+      /// pricing never reprices a booking already made. `includedKm` and
+      /// `price` are per day when `pricingUnit` is 'day'.
+      pricingUnit: {
+        type: String,
+        enum: ['hour', 'day'],
+        default: 'hour',
+      },
+      billedDays: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      includedKm: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      extraKmPrice: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      extraDayPrice: {
         type: Number,
         default: 0,
         min: 0,
@@ -585,6 +614,174 @@ const rentalBookingRequestSchema = new mongoose.Schema(
       ref: 'Admin',
       default: null,
     },
+    // --- SOW rental completion (rental/ module) -----------------------------
+    driveMode: {
+      type: String,
+      enum: ['self_drive', 'with_driver'],
+      default: 'self_drive',
+    },
+    /// Driving-licence KYC applies to self-drive only.
+    kycRequired: {
+      type: Boolean,
+      default: true,
+    },
+    withDriverSurcharge: {
+      amount: { type: Number, default: 0, min: 0 },
+      unit: {
+        type: String,
+        enum: ['per_booking', 'per_hour', 'per_day'],
+        default: 'per_day',
+      },
+    },
+    driverSurchargeAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    /// Billing switches captured at creation, so changing a setting later
+    /// never changes the price of a booking already made.
+    billingTerms: {
+      kmBillingEnabled: { type: Boolean, default: false },
+    },
+    /// The moment the rental clock stopped (first end request or completion).
+    /// Final charges are recomputed against this, so late inspection data
+    /// (odometer, damage) can still be billed without billing extra time.
+    billingEndedAt: {
+      type: Date,
+      default: null,
+    },
+    assignedUnitId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'TaxiRentalVehicleUnit',
+      default: null,
+    },
+    assignedUnitRegistration: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    assignedDriverId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'TaxiDriver',
+      default: null,
+    },
+    assignedDriverName: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    assignedDriverPhone: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    deposit: {
+      required: { type: Boolean, default: false },
+      amount: { type: Number, default: 0, min: 0 },
+      status: {
+        type: String,
+        enum: ['not_required', 'pending', 'held', 'partially_released', 'released', 'forfeited'],
+        default: 'not_required',
+      },
+      paidVia: { type: String, default: '', trim: true },
+      paymentId: { type: String, default: '', trim: true },
+      orderId: { type: String, default: '', trim: true },
+      paidAt: { type: Date, default: null },
+      releasedAmount: { type: Number, default: 0, min: 0 },
+      releasedAt: { type: Date, default: null },
+      releasedVia: { type: String, default: '', trim: true },
+      refundReference: { type: String, default: '', trim: true },
+      deductions: {
+        type: [
+          new mongoose.Schema(
+            {
+              reason: { type: String, default: '', trim: true },
+              amount: { type: Number, default: 0, min: 0 },
+              damageReportId: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'TaxiRentalDamageReport',
+                default: null,
+              },
+              createdAt: { type: Date, default: Date.now },
+            },
+            { _id: true },
+          ),
+        ],
+        default: [],
+      },
+    },
+    extensions: {
+      type: [
+        new mongoose.Schema(
+          {
+            from: { type: Date, required: true },
+            to: { type: Date, required: true },
+            hours: { type: Number, default: 0, min: 0 },
+            amount: { type: Number, default: 0, min: 0 },
+            includedKm: { type: Number, default: 0, min: 0 },
+            status: {
+              type: String,
+              enum: ['requested', 'approved', 'rejected', 'paid'],
+              default: 'requested',
+            },
+            paymentId: { type: String, default: '', trim: true },
+            paidVia: { type: String, default: '', trim: true },
+            paidAt: { type: Date, default: null },
+            autoApproved: { type: Boolean, default: false },
+            note: { type: String, default: '', trim: true },
+            decidedAt: { type: Date, default: null },
+            decidedBy: { type: String, default: '', trim: true },
+          },
+          { _id: true, timestamps: true },
+        ),
+      ],
+      default: [],
+    },
+    /// Charges added after the fact (damage the deposit could not cover).
+    additionalCharges: {
+      type: [
+        new mongoose.Schema(
+          {
+            type: { type: String, default: 'damage', trim: true },
+            reason: { type: String, default: '', trim: true },
+            amount: { type: Number, default: 0, min: 0 },
+            damageReportId: {
+              type: mongoose.Schema.Types.ObjectId,
+              ref: 'TaxiRentalDamageReport',
+              default: null,
+            },
+            createdAt: { type: Date, default: Date.now },
+          },
+          { _id: true },
+        ),
+      ],
+      default: [],
+    },
+    damageReportIds: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: 'TaxiRentalDamageReport',
+      default: [],
+    },
+    invoice: {
+      invoiceNumber: { type: String, default: '', trim: true },
+      generatedAt: { type: Date, default: null },
+      emailedAt: { type: Date, default: null },
+      emailStatus: { type: String, default: '', trim: true },
+    },
+    /// Corporate rental (7.3): stored only; the corporate module integrates.
+    corporateId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+    corporateEmployeeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+    billingMode: {
+      type: String,
+      enum: ['self', 'corporate'],
+      default: 'self',
+    },
     rentalTracking: {
       trackingStatus: {
         type: String,
@@ -655,6 +852,72 @@ rentalBookingRequestSchema.index({ status: 1, createdAt: -1 });
 rentalBookingRequestSchema.index({ userId: 1, createdAt: -1 });
 rentalBookingRequestSchema.index({ vehicleTypeId: 1, createdAt: -1 });
 rentalBookingRequestSchema.index({ 'rentalTracking.currentLocation': '2dsphere' });
+rentalBookingRequestSchema.index({ vehicleTypeId: 1, status: 1, pickupDateTime: 1, returnDateTime: 1 });
+rentalBookingRequestSchema.index({ assignedUnitId: 1, status: 1 });
+rentalBookingRequestSchema.index({ corporateId: 1, createdAt: -1 });
+
+const RENTAL_SETTLED_STATUSES = ['end_requested', 'completed'];
+
+/// Keeps `finalCharge` true to the bill whenever a settled booking is saved.
+///
+/// Three code paths settle a rental (the rider ending it, the admin panel and
+/// the service-centre app), and the service-centre one never computed a
+/// charge at all. The odometer and damage findings also arrive after the
+/// rider has ended the rental. Recomputing here, against the moment the clock
+/// stopped (`billingEndedAt`), covers all of them without touching their
+/// code, and never bills time after that moment.
+///
+/// A legacy completed booking that already has a charge and no
+/// `billingEndedAt` is left exactly as it is.
+rentalBookingRequestSchema.pre('save', function rentalBillingPreSave() {
+  const settled = RENTAL_SETTLED_STATUSES.includes(String(this.status || ''));
+  this.$locals.rentalCompletedNow =
+    String(this.status || '') === 'completed' && (this.isNew || this.isModified('status'));
+  this.$locals.rentalUnitRelease =
+    ['completed', 'cancelled'].includes(String(this.status || '')) &&
+    this.isModified('status') &&
+    Boolean(this.assignedUnitId);
+
+  if (!settled) {
+    if (this.billingEndedAt) this.billingEndedAt = null;
+    return;
+  }
+
+  if (!this.billingEndedAt && (this.isModified('status') || !Number(this.finalCharge || 0))) {
+    this.billingEndedAt = this.completionRequestedAt || this.completedAt || new Date();
+  }
+
+  if (!this.billingEndedAt) return;
+
+  const metrics = computeRentalBillingMetrics(this.toObject({ depopulate: false }), this.billingEndedAt);
+  this.finalCharge = metrics.currentCharge;
+  this.finalElapsedMinutes = metrics.elapsedMinutes;
+});
+
+/// Invoice on completion, whichever path completed it. Imported lazily so the
+/// model does not pull PDF and mail code (and their imports) in at load time,
+/// and run after the response so a mail problem never fails the completion.
+rentalBookingRequestSchema.post('save', function rentalInvoicePostSave(doc) {
+  if (doc?.$locals?.rentalUnitRelease) {
+    doc.$locals.rentalUnitRelease = false;
+    const snapshot = {
+      _id: doc._id,
+      assignedUnitId: doc.assignedUnitId,
+      rentalInspection: doc.rentalInspection,
+    };
+    import('../../rental/services/rentalInventoryService.js')
+      .then((module) => module.releaseUnitForBooking(snapshot))
+      .catch((error) => console.error('[rental-unit] release failed:', error?.message || error));
+  }
+  if (!doc?.$locals?.rentalCompletedNow) return;
+  doc.$locals.rentalCompletedNow = false;
+  const bookingId = doc._id;
+  setImmediate(() => {
+    import('../../rental/services/rentalInvoiceService.js')
+      .then((module) => module.sendRentalInvoiceOnCompletion({ bookingId }))
+      .catch((error) => console.error('[rental-invoice] completion hook failed:', error?.message || error));
+  });
+});
 
 export const RentalBookingRequest =
   mongoose.models.TaxiRentalBookingRequest ||

@@ -1,3 +1,5 @@
+import { createDefaultRentalSettings } from '../../rental/data/defaultRentalSettings.js';
+
 export const createDefaultBusinessSettings = () => ({
   scope: 'default',
   general: {
@@ -102,6 +104,7 @@ export const createDefaultBusinessSettings = () => ({
     // the apps have always quoted.
     outstation_round_trip_multiplier: '1.8',
   },
+  rental: createDefaultRentalSettings(),
   bid_ride: {
     // The master switch, and which services may be bid on at all. Both are
     // read by biddingPolicyService; an absent bidding_services means every

@@ -1377,8 +1377,8 @@ export const getRentalQuoteRequests = asyncHandler(async (_req, res) =>
 export const updateRentalQuoteRequest = asyncHandler(async (req, res) =>
   ok(res, await adminService.updateRentalQuoteRequest(req.params.id, req.body, req.auth?.sub)),
 );
-export const getRentalBookingRequests = asyncHandler(async (_req, res) =>
-  ok(res, { results: await adminService.listRentalBookingRequests() }),
+export const getRentalBookingRequests = asyncHandler(async (req, res) =>
+  ok(res, { results: await adminService.listRentalBookingRequests(req.query) }),
 );
 export const getRentalTrackingDashboard = asyncHandler(async (_req, res) =>
   ok(res, await adminService.getRentalTrackingDashboard()),
