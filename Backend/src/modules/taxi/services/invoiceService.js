@@ -4,6 +4,7 @@ import { Ride } from '../user/models/Ride.js';
 import { AdminBusinessSetting } from '../admin/models/AdminBusinessSetting.js';
 import { getLandingContent } from '../admin/services/landingContentService.js';
 import { sendEmail } from './mailService.js';
+import { buildIntercityDetails, buildInvoiceLineItems, buildParcelDetails } from './invoiceLineItems.js';
 
 /**
  * Trip invoice PDF, emailed to the rider when a ride completes.
@@ -47,12 +48,14 @@ const resolveFonts = () => {
 const FONTS = resolveFonts();
 
 const money = (amount, symbol) => {
-  const value = Number(amount || 0);
+  const raw = Number(amount || 0);
+  // Discounts are negative lines; the sign goes before the currency symbol.
+  const value = Math.abs(raw);
   const formatted = value.toLocaleString('en-IN', {
     minimumFractionDigits: value % 1 === 0 ? 0 : 2,
     maximumFractionDigits: 2,
   });
-  return `${symbol}${formatted}/-`;
+  return `${raw < 0 ? '-' : ''}${symbol}${formatted}/-`;
 };
 
 const formatDate = (date) =>
@@ -68,6 +71,7 @@ export const buildInvoiceModel = async ({ rideId }) => {
   const ride = await Ride.findById(rideId)
     .populate('userId', 'name email phone')
     .populate('driverId', 'name phone vehicleNumber')
+    .populate('deliveryId', 'parcel')
     .lean();
 
   if (!ride) {
@@ -88,8 +92,21 @@ export const buildInvoiceModel = async ({ rideId }) => {
   const currencySymbol = FONTS.unicode ? rawSymbol : 'Rs. ';
 
   const fare = Number(ride.fare || 0);
+  // Itemised from the booked quote when the ride has one; a single "Trip Fare"
+  // line for rides from before quotes were stored.
+  const lineItems = buildInvoiceLineItems(ride);
 
   return {
+    // Identifiers and raw ride facts, for the app's native invoice screen.
+    rideId: String(ride._id),
+    invoiceNumber: `INV-${String(ride._id).slice(-8).toUpperCase()}`,
+    serviceType: String(ride.serviceType || 'ride'),
+    status: String(ride.status || ''),
+    completedAt: ride.completedAt || null,
+    distanceKm: Number(((Number(ride.estimatedDistanceMeters) || 0) / 1000).toFixed(2)),
+    durationMinutes: Math.round(Number(ride.estimatedDurationMinutes) || 0),
+    intercity: buildIntercityDetails(ride),
+    parcel: buildParcelDetails(ride),
     invoiceDate: formatDate(ride.completedAt || ride.updatedAt),
     company: {
       name: String(general.app_name || 'ZI CAB').trim(),
@@ -110,8 +127,11 @@ export const buildInvoiceModel = async ({ rideId }) => {
     },
     fare: {
       symbol: currencySymbol,
+      currencySymbol: rawSymbol,
       tripFare: fare,
       total: fare,
+      itemised: lineItems.itemised,
+      items: lineItems.items,
     },
   };
 };
@@ -201,6 +221,15 @@ export const renderInvoicePdf = (model) =>
 
     y += 46;
 
+    /// Breaks to a new page when the next block wouldn't fit above the footer.
+    /// An itemised outstation invoice can run past one A4 page.
+    const ensureSpace = (height) => {
+      if (y + height > doc.page.height - PAGE_MARGIN - 40) {
+        doc.addPage();
+        y = PAGE_MARGIN;
+      }
+    };
+
     // --- journey ------------------------------------------------------------
     sectionHeading('Journey');
 
@@ -225,7 +254,47 @@ export const renderInvoicePdf = (model) =>
 
     y += 4;
 
+    // --- outstation / parcel details ----------------------------------------
+    const detailGrid = (title, pairs) => {
+      const shown = pairs.filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== '');
+      if (!shown.length) return;
+      ensureSpace(28 + Math.ceil(shown.length / 3) * 40);
+      sectionHeading(title);
+      shown.forEach(([label, value], index) => {
+        const column = index % 3;
+        if (index > 0 && column === 0) y += 40;
+        drawLabelledColumn(doc, left + (third + 16) * column, y, third, label, String(value));
+      });
+      y += 46;
+    };
+
+    if (model.intercity) {
+      detailGrid('Outstation Trip', [
+        ['From City', model.intercity.fromCity],
+        ['To City', model.intercity.toCity],
+        ['Trip Type', model.intercity.tripTypeLabel || model.intercity.tripType],
+        ['Travel Date', model.intercity.travelDate],
+        ['Passengers', model.intercity.passengers],
+        ['Distance', model.intercity.distanceKm ? `${model.intercity.distanceKm} km` : ''],
+      ]);
+    }
+
+    if (model.parcel) {
+      detailGrid('Parcel', [
+        ['Category', model.parcel.category],
+        ['Weight', model.parcel.weight],
+        ['Contents', model.parcel.description],
+        ['Sender', model.parcel.senderName],
+        ['Receiver', model.parcel.receiverName],
+        ['Scope', model.parcel.deliveryScope],
+      ]);
+    }
+
     // --- fare summary -------------------------------------------------------
+    const fareItems = Array.isArray(model.fare.items) && model.fare.items.length
+      ? model.fare.items
+      : [{ label: 'Trip Fare', amount: model.fare.tripFare }];
+    ensureSpace(56 + fareItems.length * 22 + 22);
     sectionHeading('Fare Summary');
 
     const amountX = right - 130;
@@ -250,11 +319,15 @@ export const renderInvoicePdf = (model) =>
       y += 22;
     };
 
-    row('Trip Fare', model.fare.tripFare);
+    for (const item of fareItems) {
+      ensureSpace(22);
+      row(item.label, item.amount);
+    }
     doc.moveTo(left, y - 6).lineTo(right, y - 6).lineWidth(0.75).strokeColor(RULE).stroke();
     row('Total Amount', model.fare.total, true);
 
     // --- total banner -------------------------------------------------------
+    ensureSpace(8 + 74 + 32);
     y += 8;
     doc.rect(left, y, width, 46).fillColor(INK).fill();
     doc

@@ -324,3 +324,60 @@ export const sendOtpSms = async ({ phone, otp, purpose = 'otp' }) => {
     jobId: parsedFinalResponse?.JobId || null,
   };
 };
+
+/**
+ * Sends a free-text transactional SMS (SOS alerts and similar) through SMS
+ * India Hub.
+ *
+ * Unlike `sendOtpSms` the text is the caller's, so the caller must also pass
+ * the DLT template id the text was registered under: Indian operators drop
+ * any message that does not match its template, silently from our side.
+ * Throws on a provider rejection; callers that must not fail (SOS) catch it.
+ */
+export const sendTransactionalSms = async ({ phone, message, templateId = '' }) => {
+  const config = getSmsIndiaHubConfig();
+  const text = String(message || '').trim();
+
+  if (!text) {
+    throw new ApiError(400, 'SMS text is required');
+  }
+  if (!config.senderId || (!config.apiKey && !(config.user && config.password))) {
+    throw new ApiError(500, 'SMS India Hub is not configured');
+  }
+
+  const normalizedPhone = normalizeIndianPhone(phone);
+  if (!/^91\d{10}$/.test(normalizedPhone)) {
+    throw new ApiError(400, 'A valid Indian mobile number is required');
+  }
+
+  const payload = new URLSearchParams({
+    sid: config.senderId,
+    msisdn: normalizedPhone,
+    msg: text,
+    fl: '0',
+    gwid: '2',
+  });
+  if (templateId) payload.set('TemplateId', String(templateId));
+  if (config.apiKey) {
+    payload.set('APIKey', config.apiKey);
+  } else {
+    payload.set('user', config.user);
+    payload.set('password', config.password);
+  }
+
+  const response = await fetch(SMS_INDIA_HUB_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json, text/plain;q=0.9, */*;q=0.8',
+    },
+    body: payload.toString(),
+  });
+  const responseText = (await response.text()).trim();
+
+  if (!isSuccessfulProviderResponse(response, responseText)) {
+    throw new ApiError(502, `SMS India Hub rejected the message: ${responseText || response.statusText || 'no response'}`);
+  }
+
+  return { mode: 'live', providerResponse: responseText };
+};

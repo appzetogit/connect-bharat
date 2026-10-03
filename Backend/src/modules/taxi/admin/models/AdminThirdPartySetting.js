@@ -14,6 +14,8 @@ const adminThirdPartySettingSchema = new mongoose.Schema(
     sms: { type: mongoose.Schema.Types.Mixed, default: {} }, // Changed to Object
     payment: { type: mongoose.Schema.Types.Mixed, default: {} }, // Changed to Object
     recharge_api: { type: mongoose.Schema.Types.Mixed, default: {} },
+    // Call masking (Exotel Connect). See services/callMaskingService.js.
+    exotel: { type: mongoose.Schema.Types.Mixed, default: {} },
     notification_channels: { type: [mongoose.Schema.Types.Mixed], default: [] },
   },
   {

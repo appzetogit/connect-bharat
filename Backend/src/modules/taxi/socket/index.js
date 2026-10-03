@@ -34,6 +34,7 @@ import { authorizeRideRoomAccess } from './middleware/rideRoomAuth.js';
 import { attachSocketAuth } from './middleware/socketAuth.js';
 import { clearDriverRoute } from './services/driverRouteService.js';
 import { consumeScopedRateLimit } from '../middlewares/rateLimitMiddleware.js';
+import { acceptRideOffer, rejectRideOffer } from '../driver/services/rideOfferActionService.js';
 
 const DRIVER_LOCATION_WRITE_MIN_DISTANCE_METERS = 25;
 const DRIVER_LOCATION_WRITE_MAX_INTERVAL_MS = 15000;
@@ -464,25 +465,8 @@ export const configureTaxiSocketServer = async (httpServer) => {
           return;
         }
 
-        // First successful transaction wins; later accepts are rejected by the service layer.
-        const ride = await acceptRideAssignment({ rideId, driverId: identity.sub });
-        joinRideRoom(socket, ride._id);
-        await notifyRideAccepted(ride);
-
-        const acceptedPayload = {
-          rideId: String(ride._id),
-          room: getRideRoom(ride._id),
-          status: ride.status,
-          liveStatus: ride.liveStatus,
-          acceptedAt: ride.acceptedAt,
-        };
-
-        socket.emit('rideAccepted', acceptedPayload);
-        socket.emit(SOCKET_EVENTS.RIDE_STATE, acceptedPayload);
-        socket.emit(SOCKET_EVENTS.RIDE_JOINED, {
-          rideId: String(ride._id),
-          room: getRideRoom(ride._id),
-        });
+        // Shared with the REST fallback (POST /drivers/ride-offers/:rideId/accept).
+        await acceptRideOffer({ rideId, driverId: identity.sub, socket });
       }),
     );
 
@@ -513,12 +497,9 @@ export const configureTaxiSocketServer = async (httpServer) => {
         return;
       }
 
-      markDriverRejectedFromDispatch(rideId, identity.sub).catch((error) => {
+      // Shared with the REST fallback (POST /drivers/ride-offers/:rideId/reject).
+      rejectRideOffer({ rideId, driverId: identity.sub, socket }).catch((error) => {
         console.error('Failed to mark driver rejection from dispatch', error);
-      });
-      socket.to(getRideRoom(rideId)).emit('driverRejectedRide', {
-        rideId,
-        driverId: identity.sub,
       });
     });
 

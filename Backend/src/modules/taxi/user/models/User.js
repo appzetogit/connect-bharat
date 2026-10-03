@@ -275,6 +275,33 @@ const userSchema = new mongoose.Schema(
       ref: 'TaxiRide',
       default: null,
     },
+    /// Running average of the ratings drivers gave this rider after completed
+    /// trips. Kept on the user so the driver's ride card can show it without
+    /// aggregating rides. Meaningless while ratingCount is 0.
+    rating: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5,
+    },
+    ratingCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    /// People SMSed when the rider presses SOS. Same shape as a driver's
+    /// emergencyContacts so both apps can share one contact picker.
+    emergencyContacts: {
+      type: [
+        {
+          name: { type: String, required: true, trim: true },
+          phone: { type: String, required: true, trim: true },
+          relation: { type: String, default: '', trim: true },
+          source: { type: String, enum: ['manual', 'device'], default: 'manual' },
+        },
+      ],
+      default: [],
+    },
   },
   {
     timestamps: true,

@@ -27,6 +27,7 @@ import { getTransportRideSettings } from './transportSettingsService.js';
 import { findZoneByPickup } from './matchingService.js';
 import { applyRideWaitingCharge, recordWaitingChargeInBreakdown } from './rideWaitingChargeService.js';
 import { applyOutstationFinalFare, assertOutstationOdometer, buildOutstationBookingFields, quoteOutstationFare, serializeOutstationRealtime } from '../outstation/services/outstationHooks.js';
+import { buildDateRangeCondition } from './dateRangeFilter.js';
 
 const clearUserActiveRideIfPresent = async (user) => {
   if (!user?.currentRideId) {
@@ -1590,7 +1591,7 @@ export const createRideRecord = async ({
 export const getRideDetails = async (rideId) => {
   const ride = await Ride.findById(rideId)
     .populate('deliveryId')
-    .populate('userId', 'name phone')
+    .populate('userId', 'name phone rating ratingCount')
     .populate('driverId', 'name phone profileImage vehicleType vehicleIconType vehicleNumber vehicleColor vehicleMake vehicleModel vehicleImage rating');
 
   if (!ride) {
@@ -1607,7 +1608,7 @@ const activeRideStatuses = [RIDE_STATUS.SEARCHING, RIDE_STATUS.ACCEPTED, RIDE_ST
 const populateRideRealtime = async (rideId) =>
   Ride.findById(rideId)
     .populate('deliveryId')
-    .populate('userId', 'name phone')
+    .populate('userId', 'name phone rating ratingCount')
     .populate('driverId', 'name phone profileImage vehicleType vehicleIconType vehicleNumber vehicleColor vehicleMake vehicleModel vehicleImage rating');
 
 export const serializeRideRealtime = (ride) => ({
@@ -1726,6 +1727,9 @@ export const serializeRideRealtime = (ride) => ({
       }
     : null,
   user: ride.userId,
+  /// The rider's average from drivers' ratings, for the driver's ride card.
+  /// Null until a driver has rated them, so a new rider isn't shown as 0 stars.
+  userRating: Number(ride.userId?.ratingCount || 0) > 0 ? Number(Number(ride.userId.rating || 0).toFixed(1)) : null,
   driver: ride.driverId,
   messages: (ride.messages || []).slice(-30).map((message) => ({
     id: String(message._id),
@@ -1771,7 +1775,7 @@ export const getActiveRideForIdentity = async ({ role, entityId }) => {
       status: { $in: activeRideStatuses },
     })
       .sort({ updatedAt: -1 })
-      .populate('userId', 'name phone')
+      .populate('userId', 'name phone rating ratingCount')
       .populate('driverId', 'name phone profileImage vehicleType vehicleIconType vehicleNumber vehicleColor vehicleMake vehicleModel vehicleImage rating');
 
     return rides.find((ride) => !isRideScheduledForFuture(ride)) || null;
@@ -1780,7 +1784,7 @@ export const getActiveRideForIdentity = async ({ role, entityId }) => {
   return null;
 };
 
-export const listRideHistoryForIdentity = async ({ role, entityId, limit = 50, page = 1, category = 'all' }) => {
+export const listRideHistoryForIdentity = async ({ role, entityId, limit = 50, page = 1, category = 'all', from = null, to = null }) => {
   if (!['user', 'driver'].includes(role)) {
     throw new ApiError(403, 'Only riders and drivers can access ride history');
   }
@@ -1812,6 +1816,13 @@ export const listRideHistoryForIdentity = async ({ role, entityId, limit = 50, p
     ];
   } else if (normalizedCategory === 'scheduled') {
     query.scheduledAt = { $ne: null };
+  }
+
+  /// Optional booking-date window. Absent means no filter, so existing callers
+  /// get exactly the old query.
+  const createdAtRange = buildDateRangeCondition({ from, to });
+  if (createdAtRange) {
+    query.createdAt = createdAtRange;
   }
 
   const counterpartPath = role === 'driver' ? 'userId' : 'driverId';

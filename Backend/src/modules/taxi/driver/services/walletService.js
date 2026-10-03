@@ -489,7 +489,14 @@ export const settleCompletedRideWallet = async ({ rideId }) => {
     ride.paymentMethod = paymentMethod;
     ride.commissionAmount = commissionAmount;
     ride.driverEarnings = driverEarnings;
+    // Spread the existing snapshot first: replacing it outright erased the
+    // booked fare breakdown, fare source and waiting terms the invoice and the
+    // outstation fare adjustment read after completion.
+    const existingSnapshot = typeof ride.pricingSnapshot?.toObject === 'function'
+      ? ride.pricingSnapshot.toObject()
+      : (ride.pricingSnapshot || {});
     ride.pricingSnapshot = {
+      ...existingSnapshot,
       setPriceId: ride.pricingSnapshot?.setPriceId || commissionConfig.setPriceId || null,
       admin_commission_type_from_driver: Number(commissionConfig.type ?? ride.pricingSnapshot?.admin_commission_type_from_driver ?? 1),
       admin_commission_from_driver: Number(commissionConfig.value ?? ride.pricingSnapshot?.admin_commission_from_driver ?? 0),
