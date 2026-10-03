@@ -14,6 +14,8 @@ import { adjustCorporateAccount } from './corporateLedger.js';
 import { assertPasswordStrength, hashCorporatePassword, serializeCorporateAdmin } from './corporateAuthService.js';
 import { normalizeIndianPhone, round2 } from './corporatePolicyEngine.js';
 import { getCorporateSettings, isFlagOn } from './corporateSettingsService.js';
+import { BILLING_CYCLES, EXCESS_PAYMENT_METHODS, TRAVEL_ZONE_MODES, TRAVEL_ZONE_RULES } from '../models/Corporate.js';
+import { ensureCorporateRoles } from './corporateRoleService.js';
 
 /// Company lifecycle (SOW 8.1, 2.13), departments, policies and panel users.
 
@@ -103,7 +105,103 @@ const pickTerms = (body = {}) => {
   const locationIds = cleanIds(body.serviceLocationIds);
   if (locationIds) terms.serviceLocationIds = locationIds;
   if (body.notes !== undefined) terms.notes = str(body.notes);
+  Object.assign(terms, pickV2Terms(body));
   return terms;
+};
+
+const money = (value, field) => {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric) || numeric < 0) throw new ApiError(400, `${field} must be zero or more`);
+  return round2(numeric);
+};
+
+const pickRate = (row = {}, field = 'tariff') => ({
+  baseFare: money(row.baseFare, `${field}.baseFare`),
+  baseKm: money(row.baseKm, `${field}.baseKm`),
+  perKm: money(row.perKm, `${field}.perKm`),
+  perMinute: money(row.perMinute, `${field}.perMinute`),
+  minimumFare: money(row.minimumFare, `${field}.minimumFare`),
+});
+
+/// Office boundary as stored. Offices take { name, address, lat, lng,
+/// radiusKm } or { location: { coordinates: [lng, lat] } }.
+export const pickTravelZone = (zone = {}) => {
+  const mode = zone.mode === undefined ? 'free_roaming' : zone.mode;
+  if (!TRAVEL_ZONE_MODES.includes(mode)) throw new ApiError(400, `travelZone.mode must be one of ${TRAVEL_ZONE_MODES.join(', ')}`);
+  const rule = zone.rule === undefined ? 'both_ends' : zone.rule;
+  if (!TRAVEL_ZONE_RULES.includes(rule)) throw new ApiError(400, `travelZone.rule must be one of ${TRAVEL_ZONE_RULES.join(', ')}`);
+  const offices = (Array.isArray(zone.offices) ? zone.offices : []).map((office, index) => {
+    const coords = Array.isArray(office?.location?.coordinates) ? office.location.coordinates : [office?.lng, office?.lat];
+    const lng = Number(coords[0]);
+    const lat = Number(coords[1]);
+    if (!Number.isFinite(lng) || !Number.isFinite(lat) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      throw new ApiError(400, `travelZone.offices[${index}] needs a valid lat/lng`);
+    }
+    const radiusKm = Number(office?.radiusKm);
+    if (!(radiusKm > 0)) throw new ApiError(400, `travelZone.offices[${index}].radiusKm must be greater than 0`);
+    return {
+      ...(isId(office?._id || office?.id) ? { _id: office._id || office.id } : {}),
+      name: str(office?.name),
+      address: str(office?.address),
+      location: { type: 'Point', coordinates: [lng, lat] },
+      radiusKm: round2(radiusKm),
+    };
+  });
+  if (mode === 'office_boundary' && !offices.length) throw new ApiError(400, 'Add at least one office to use an office boundary');
+  return { mode, rule, offices };
+};
+
+/// Corporate v2 terms (contract §1.3), admin only.
+const pickV2Terms = (body = {}) => {
+  const terms = {};
+  if (body.billingCycle !== undefined) {
+    if (!BILLING_CYCLES.includes(body.billingCycle)) throw new ApiError(400, 'billingCycle must be weekly or monthly');
+    terms.billingCycle = body.billingCycle;
+  }
+  if (body.tariff && typeof body.tariff === 'object') {
+    const tariff = body.tariff;
+    const vehicleRows = Array.isArray(tariff.byVehicleType) ? tariff.byVehicleType : [];
+    const seen = new Set();
+    terms.tariff = {
+      enabled: tariff.enabled === true || tariff.enabled === 'true',
+      ...pickRate(tariff),
+      byVehicleType: vehicleRows.map((row, index) => {
+        if (!isId(row?.vehicleTypeId)) throw new ApiError(400, `tariff.byVehicleType[${index}].vehicleTypeId is invalid`);
+        if (seen.has(String(row.vehicleTypeId))) throw new ApiError(400, 'tariff.byVehicleType lists a vehicle type twice');
+        seen.add(String(row.vehicleTypeId));
+        return { vehicleTypeId: row.vehicleTypeId, ...pickRate(row, `tariff.byVehicleType[${index}]`) };
+      }),
+      appliesTo: cleanServices(tariff.appliesTo)?.length ? cleanServices(tariff.appliesTo) : ['ride', 'intercity'],
+    };
+  }
+  if (body.driverCommission && typeof body.driverCommission === 'object') {
+    const type = body.driverCommission.type === 'fixed' ? 'fixed' : 'percentage';
+    const value = money(body.driverCommission.value, 'driverCommission.value');
+    if (type === 'percentage' && value > 100) throw new ApiError(400, 'A percentage commission cannot exceed 100');
+    terms.driverCommission = { enabled: body.driverCommission.enabled === true || body.driverCommission.enabled === 'true', type, value };
+  }
+  if (body.travelZone && typeof body.travelZone === 'object') terms.travelZone = pickTravelZone(body.travelZone);
+  if (body.excessPayment && typeof body.excessPayment === 'object') {
+    const methods = Array.isArray(body.excessPayment.allowedMethods)
+      ? [...new Set(body.excessPayment.allowedMethods.map((item) => str(item).toLowerCase()).filter((item) => EXCESS_PAYMENT_METHODS.includes(item)))]
+      : [];
+    if (!methods.length) throw new ApiError(400, `excessPayment.allowedMethods needs at least one of ${EXCESS_PAYMENT_METHODS.join(', ')}`);
+    terms.excessPayment = { allowedMethods: methods };
+  }
+  return terms;
+};
+
+/// Panel GET / PUT /travel-zone.
+export const getCorporateTravelZone = (corporate) => {
+  const zone = corporate.travelZone?.toObject ? corporate.travelZone.toObject() : (corporate.travelZone || {});
+  return { mode: zone.mode || 'free_roaming', rule: zone.rule || 'both_ends', offices: zone.offices || [] };
+};
+
+export const updateCorporateTravelZone = async ({ corporateId, body = {} }) => {
+  const corporate = await getCorporateOrThrow(corporateId);
+  corporate.travelZone = pickTravelZone(body);
+  await corporate.save();
+  return getCorporateTravelZone(corporate);
 };
 
 const createOwnerAdmin = async ({ corporateId, owner = {}, requirePassword }) => {
@@ -143,6 +241,7 @@ export const registerCorporate = async (body = {}) => {
   const corporate = await Corporate.create({ ...profile, code: generateCorporateCode(profile.name), status: 'pending', source: 'self' });
   try {
     const admin = await createOwnerAdmin({ corporateId: corporate._id, owner, requirePassword: true });
+    await ensureCorporateRoles(corporate._id).catch((error) => console.warn('[corporate] role seeding failed', error.message));
     return { corporate: corporate.toObject(), admin: serializeCorporateAdmin(admin) };
   } catch (error) {
     await Corporate.deleteOne({ _id: corporate._id });
@@ -177,6 +276,7 @@ export const createCorporateByAdmin = async ({ adminId, body = {}, enquiryId = n
   });
   try {
     const admin = await createOwnerAdmin({ corporateId: corporate._id, owner, requirePassword: false });
+    await ensureCorporateRoles(corporate._id).catch((error) => console.warn('[corporate] role seeding failed', error.message));
     return { corporate: corporate.toObject(), admin: serializeCorporateAdmin(admin) };
   } catch (error) {
     await Corporate.deleteOne({ _id: corporate._id });

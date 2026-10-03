@@ -27,5 +27,7 @@ export const errorHandler = (error, _req, res, _next) => {
     success: false,
     message: error.message || 'Internal server error',
     details: error instanceof ApiError ? error.details : undefined,
+    // Extra top-level fields an ApiError asked for (e.g. corporate `code`).
+    ...(error instanceof ApiError && error.body && typeof error.body === 'object' ? error.body : {}),
   });
 };

@@ -321,3 +321,98 @@ Invoice: `{ invoiceNumber: "CORP/2627/00001", periodFrom, periodTo, periodKey, l
 **Rentals:** invoices and usage reports include completed `RentalBookingRequest`s with `corporateId` = the company and `billingMode` `corporate` (or unset), read from the raw collection because those fields are being added by the rental work. Amount = `corporateBilledAmount` if present, else `totalCost` less the corporate discount for `rental`. They are charged to the account when the invoice is generated (reference `rental:<id>`, idempotent) and stamped with `corporateInvoiceId`.
 
 **Ledger merge note:** `corporate/services/corporateLedger.js` exports `chargeCorporateAccount({ corporateId, amount, reference })` with the same signature as the planned `payments/services/ledgerService.js`; it writes to `CorporateLedgerEntry` until that lands.
+
+---
+
+## 6. Corporate v2 (roles, employee IDs, km allowance, company tariff, office boundary, travel desk, weekly billing)
+
+Full contract: `docs/plans/corporate-v2.md`. Everything per company defaults off, so a company behaves as above until an admin configures it.
+
+### 6.1 Rider app (Flutter) — what changes
+
+**`GET /users/me/corporate`** — each membership gains:
+
+```json
+"employeeCode": "ACME-0007",
+"role": { "id": "...", "name": "Director", "code": "DIR" },
+"allowance": { "enabled": true, "period": "weekly", "periodKey": "2026-W41", "allowanceKm": 150, "usedKm": 62.4, "reservedKm": 12, "remainingKm": 75.6 },
+"travelZone": { "mode": "office_boundary", "rule": "both_ends", "offices": [{ "name": "HQ", "lat": 12.97, "lng": 77.59, "radiusKm": 5 }] },
+"excessPayment": { "allowedMethods": ["cash", "online", "wallet"] },
+"pricing": "company_tariff",
+"tariffAppliesTo": ["ride", "intercity"]
+```
+
+`allowance.enabled: false` = no km limit (the company pays every km). `travelZone.mode: "free_roaming"` = no boundary. `monthlyLimit` is now the employee's own limit, or the role's `monthlySpendLimit` when the employee has none.
+
+**`POST /rides/estimate`** with `"paymentMethod": "corporate"` (and optional `corporateId`) — each quote gains:
+
+```json
+"corporate": {
+  "eligible": true,
+  "fare": 420,
+  "pricing": "company_tariff",
+  "breakdown": { "tariff": "corporate", "baseFare": 50, "distanceFare": 300, "...": "..." },
+  "allowance": { "enabled": true, "period": "weekly", "periodKey": "2026-W41", "allowanceKm": 150, "remainingKm": 20, "remainingKmAtBooking": 20, "estimatedKm": 25, "coveredKm": 20, "excessKm": 5 },
+  "split": { "companyAmount": 336, "employeeAmount": 84, "discountAmount": 0, "billedAmount": 336 },
+  "employeePaymentRequired": true,
+  "allowedMethods": ["cash", "online", "wallet"],
+  "withinBoundary": true
+}
+```
+
+`eligible: false` comes with `reason` (not an employee, company inactive, ...). When `pricing` is `company_tariff`, `corporate.fare` (not the quote's top-level `fare`) is what the trip is booked at.
+
+**`POST /rides`** (and socket `requestRide`) with `paymentMethod: "corporate"` accepts:
+- `employeePaymentMethod`: `cash | online | wallet`, **required when the estimate has an excess** (`employeeAmount > 0`), and must be in `excessPayment.allowedMethods`. Otherwise 400 `{ code: "corporate_employee_payment_method", allowedMethods, employeeAmount, companyAmount }`.
+- `corporateId`: which company, for riders in more than one.
+
+New refusal: 403 `{ code: "corporate_outside_boundary", rule, offices: [...] }` (fields at the top level of the error body and under `details`) when the company only allows trips around its offices.
+
+`ride.corporate` gains `roleId`, `pricing`, `bookedByCorporateAdminId` (set when the company's travel desk booked it for you), `allowance { periodKey, allowanceKm, remainingKmAtBooking, estimatedKm, coveredKm, excessKm, actualKm }` and `split { companyAmount, employeeAmount, employeePaymentMethod, employeePaymentStatus: not_required|pending|paid, stage: estimate|final }`. Every completed ride (corporate or not) gains `actualDistanceMeters` and `actualDistanceSource` (`odometer | gps | estimate`).
+
+**Completion.** The split is recomputed on the actual km and the final fare (`split.stage: "final"`). If it produces an excess the estimate did not, the method defaults to cash when allowed, else online.
+- `employeePaymentMethod: "cash"` → the **driver collects `split.employeeAmount`** (driver app: show "Collect Rs X from the rider" when `paymentMethod == corporate` and the split has a cash amount). It is marked `paid` on completion.
+- `online` / `wallet` → the rider pays through the existing completion endpoints: `POST /rides/:id/complete-payment/razorpay/order` + `/verify`, or `/complete-payment/wallet`. For a corporate ride they charge **exactly `split.employeeAmount`** (plus any tip) and keep the ride `corporate`; with nothing owed they return 400 `No payable amount remains for this ride` — then submit the rating with `PATCH /rides/:id/feedback`.
+
+Push `data.type` added: `corporate_trip_booked` (a panel user booked a trip for you), `corporate_trip_cancelled` (they cancelled it).
+
+### 6.2 Corporate panel additions
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `/corporate/roles` | any | `{ results: [Role + employeeCount] }`. Seeded CEO / VP / Employee on first read |
+| POST | `/corporate/roles` | owner, admin | `{ name, code?, level?, active?, isDefault?, allowance { enabled, km, period: weekly\|monthly }, allowedServices[], allowedVehicleTypeIds[], maxFarePerTrip, requireApprovalAlways, requireApprovalAbove, monthlySpendLimit }` |
+| PATCH | `/corporate/roles/:roleId` | owner, admin | partial |
+| DELETE | `/corporate/roles/:roleId?reassignToRoleId=` | owner, admin | 409 if default or active employees use it (unless reassigning) |
+| POST | `/corporate/roles/:roleId/make-default` | owner, admin | |
+| POST | `/corporate/roles/:roleId/assign` | owner, admin | `{ employeeIds }` → `{ role, matched, updated, notFound }` |
+| GET | `/corporate/employees?roleId=` | any | rows gain `role {id,name,code}`, `employeeCode`, `allowance {enabled, period, periodKey, allowanceKm, usedKm, reservedKm, remainingKm}` |
+| POST/PATCH | `/corporate/employees[/:id]` | owner, admin | + `roleId`; `employeeCode` optional (generated `<COMPANYCODE>-0001` when blank, uppercased, unique per company → 409 on clash) |
+| GET | `/corporate/employees/:id/allowance?periods=6` | any | `{ role, current, history[] }` |
+| GET / PUT | `/corporate/travel-zone` | any / owner, admin | `{ mode: free_roaming\|office_boundary, rule: both_ends\|either_end, offices: [{ name, address, lat, lng, radiusKm }] }` (stored with `location.coordinates [lng,lat]`) |
+| POST | `/corporate/bookings/quote` | owner, admin, approver | `{ employeeId, pickup{lat,lng}, drop{lat,lng}, vehicleTypeId?, serviceType?, scheduledAt? }` → `{ employee, quotes: [{ vehicleTypeId, vehicleName, available, reason, fare, pricing, breakdown, allowance, split, allowedMethods, employeePaymentRequired, withinBoundary }] }` |
+| POST | `/corporate/bookings` | owner, admin, approver | `{ employeeId, pickup{lat,lng,address}, drop{lat,lng,address}, vehicleTypeId, serviceType?, scheduledAt?, employeePaymentMethod?, note? }` → `{ ride: { id, status, fare, split, allowance, approvalStatus } }`. 409 if the employee already has a trip in progress or booked. No approval step for these roles |
+| GET | `/corporate/bookings?status&employeeId&from&to&page&limit` | any | `{ items, total, page, limit }` |
+| POST | `/corporate/bookings/:rideId/cancel` | owner, admin, approver | `{ reason? }`; only before the trip starts |
+| GET | `/corporate/invoices/:id/export.csv` / `.xlsx` | owner, admin, finance | per-trip annex (+ by-role / by-employee sheets in xlsx) |
+
+Employee import: new `Role Code` column (role name accepted); unknown role fails the row. Blank Employee Code = generated.
+
+### 6.3 Platform admin additions
+
+- `PATCH /admin/corporates/:id` (and `POST /`, `/approve`) also accept `billingCycle: weekly|monthly`, `tariff { enabled, baseFare, baseKm, perKm, perMinute, minimumFare, byVehicleType: [{ vehicleTypeId, ... }], appliesTo[] }`, `driverCommission { enabled, type: percentage|fixed, value }`, `travelZone`, `excessPayment { allowedMethods }`.
+- `GET/POST/PATCH/DELETE /admin/corporates/:id/roles[/:roleId]`, `POST .../roles/:roleId/make-default`, `POST .../roles/:roleId/assign`.
+- `GET /admin/corporates/:id/allowance?periodKey=2026-10|2026-W41` → `{ periodKey, results: [{ employeeId, name, employeeCode, role, period, allowanceKm, usedKm, reservedKm, remainingKm, rides }] }`.
+- `GET /admin/corporates/:id/employees?roleId=` rows gain `role` and `allowance`.
+- `GET /admin/corporates/invoices/:invoiceId/export.csv` / `.xlsx`.
+- Settings (`/admin/corporates/settings`): `allowance_enabled`, `tariff_enabled`, `travel_zone_enabled`, `travel_desk_enabled`, all `'1'` (master switches over per-company settings that default off).
+
+### 6.4 Money flow with v2
+
+1. Booking: fare from the company tariff when on, else Set Price. Estimated split on the routed km against the employee's remaining allowance; the covered km are **reserved** on `CorporateAllowanceUsage` (atomic). Policy, monthly cap and credit limit are checked on the company share after discount.
+2. Cancellation (any path): the reservation is released.
+3. Completion: `actualDistanceMeters` (odometer > GPS trail > estimate) → reservation released → covered km consumed (atomic) → final split. Driver wallet: commission on the full fare (company override when set); credited `fare − commission`, minus `employeeAmount` when the driver collected it in cash. The company is billed `split.companyAmount − discount`.
+4. Invoices: lines carry the split; `subtotal` is the company share; `byRole`, `byEmployee`, `employeePaidTotal`. Weekly companies are invoiced for the previous ISO week (Mon–Wed IST catch-up); monthly as before.
+5. Rentals: on completion the inspection odometer km consume the allowance and split the rental charge (no readings = 0 km); the employee share is recorded on the booking and invoice for the rental desk to collect.
+
+Backfill for existing data: `node scripts/backfillCorporateV2.js --dry-run`, then without the flag, then `node scripts/ensureIndexes.js`.

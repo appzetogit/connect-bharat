@@ -6,6 +6,7 @@ import { requireCorporateAccess, requireCorporatesPermission } from '../middlewa
 import * as panel from '../controllers/corporatePanelController.js';
 import * as admin from '../controllers/adminCorporateController.js';
 import { getMyCorporate } from '../controllers/riderCorporateController.js';
+import * as v2 from '../controllers/corporateV2Controller.js';
 
 /// Every corporate route, mounted from routes/index.js with one line. Three
 /// surfaces:
@@ -42,9 +43,24 @@ panelRouter.post('/employees/import', managers, h(panel.importEmployees));
 panelRouter.get('/employees', anyRole, h(panel.listEmployees));
 panelRouter.post('/employees', managers, h(panel.createEmployee));
 panelRouter.get('/employees/:employeeId', anyRole, h(panel.getEmployee));
+panelRouter.get('/employees/:employeeId/allowance', anyRole, h(v2.employeeAllowance));
 panelRouter.patch('/employees/:employeeId', managers, h(panel.updateEmployee));
 panelRouter.post('/employees/:employeeId/deactivate', managers, h(panel.deactivateEmployee));
 panelRouter.post('/employees/:employeeId/invite', managers, h(panel.inviteEmployee));
+
+// Corporate v2: roles, travel zone, travel desk (docs/plans/corporate-v2.md §3.1).
+panelRouter.get('/roles', anyRole, h(v2.panelRoles.list));
+panelRouter.post('/roles', managers, h(v2.panelRoles.create));
+panelRouter.patch('/roles/:roleId', managers, h(v2.panelRoles.update));
+panelRouter.delete('/roles/:roleId', managers, h(v2.panelRoles.remove));
+panelRouter.post('/roles/:roleId/make-default', managers, h(v2.panelRoles.makeDefault));
+panelRouter.post('/roles/:roleId/assign', managers, h(v2.panelRoles.assign));
+panelRouter.get('/travel-zone', anyRole, h(v2.getTravelZone));
+panelRouter.put('/travel-zone', managers, h(v2.putTravelZone));
+panelRouter.post('/bookings/quote', deciders, h(v2.quoteBooking));
+panelRouter.post('/bookings', deciders, h(v2.createBooking));
+panelRouter.get('/bookings', anyRole, h(v2.listBookings));
+panelRouter.post('/bookings/:rideId/cancel', deciders, h(v2.cancelBooking));
 
 panelRouter.get('/departments', anyRole, h(panel.getDepartments));
 panelRouter.post('/departments', managers, h(panel.postDepartment));
@@ -69,6 +85,8 @@ panelRouter.get('/outstanding', money, h(panel.getOutstanding));
 panelRouter.get('/invoices', money, h(panel.getInvoices));
 panelRouter.get('/invoices/:invoiceId', money, h(panel.getInvoice));
 panelRouter.get('/invoices/:invoiceId/pdf', money, h(panel.downloadInvoicePdf));
+panelRouter.get('/invoices/:invoiceId/export.csv', money, h(v2.panelInvoiceCsv));
+panelRouter.get('/invoices/:invoiceId/export.xlsx', money, h(v2.panelInvoiceXlsx));
 panelRouter.post('/invoices/:invoiceId/pay', money, h(panel.payInvoice));
 panelRouter.post('/invoices/:invoiceId/sync-payment', money, h(panel.syncInvoicePayment));
 
@@ -91,6 +109,8 @@ adminRouter.post('/from-enquiry/:enquiryId', h(admin.fromEnquiry));
 adminRouter.get('/invoices', h(admin.allInvoices));
 adminRouter.get('/invoices/:invoiceId', h(admin.invoice));
 adminRouter.get('/invoices/:invoiceId/pdf', h(admin.invoicePdf));
+adminRouter.get('/invoices/:invoiceId/export.csv', h(v2.adminInvoiceCsv));
+adminRouter.get('/invoices/:invoiceId/export.xlsx', h(v2.adminInvoiceXlsx));
 adminRouter.post('/invoices/:invoiceId/issue', h(admin.issueInvoice));
 adminRouter.post('/invoices/:invoiceId/email', h(admin.emailInvoice));
 adminRouter.post('/invoices/:invoiceId/payments', h(admin.recordPayment));
@@ -109,6 +129,13 @@ adminRouter.post('/:id/employees', h(admin.addEmployee));
 adminRouter.patch('/:id/employees/:employeeId', h(admin.editEmployee));
 adminRouter.post('/:id/employees/import', h(admin.importEmployees));
 adminRouter.get('/:id/departments', h(admin.departments));
+adminRouter.get('/:id/roles', h(v2.adminRoles.list));
+adminRouter.post('/:id/roles', h(v2.adminRoles.create));
+adminRouter.patch('/:id/roles/:roleId', h(v2.adminRoles.update));
+adminRouter.delete('/:id/roles/:roleId', h(v2.adminRoles.remove));
+adminRouter.post('/:id/roles/:roleId/make-default', h(v2.adminRoles.makeDefault));
+adminRouter.post('/:id/roles/:roleId/assign', h(v2.adminRoles.assign));
+adminRouter.get('/:id/allowance', h(v2.adminAllowance));
 adminRouter.get('/:id/trip-requests', h(admin.tripRequests));
 adminRouter.get('/:id/trips', h(admin.trips));
 adminRouter.get('/:id/reports/usage', h(admin.usage));

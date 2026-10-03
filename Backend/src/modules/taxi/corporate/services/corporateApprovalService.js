@@ -8,6 +8,7 @@ import { Corporate } from '../models/Corporate.js';
 import { CorporateEmployee } from '../models/CorporateEmployee.js';
 import { CorporateTripRequest } from '../models/CorporateTripRequest.js';
 import { notifyApproversOfTrip, notifyRider } from './corporateNotifyService.js';
+import { releaseRideAllowance } from './corporateAllowanceService.js';
 
 /// Trip approval (SOW 8.3).
 ///
@@ -116,6 +117,7 @@ const cancelHeldRide = async ({ rideId, approvalStatus, reason }) => {
     return null;
   }
 
+  await releaseRideAllowance(ride._id);
   await Promise.all([
     User.updateOne({ _id: ride.userId, currentRideId: ride._id }, { $set: { currentRideId: null } }),
     ride.deliveryId

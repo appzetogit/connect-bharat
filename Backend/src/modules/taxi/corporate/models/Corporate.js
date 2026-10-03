@@ -18,6 +18,34 @@ const addressSchema = new mongoose.Schema(
   { _id: false },
 );
 
+export const BILLING_CYCLES = Object.freeze(['weekly', 'monthly']);
+export const TRAVEL_ZONE_MODES = Object.freeze(['free_roaming', 'office_boundary']);
+export const TRAVEL_ZONE_RULES = Object.freeze(['both_ends', 'either_end']);
+export const EXCESS_PAYMENT_METHODS = Object.freeze(['cash', 'online', 'wallet']);
+
+const tariffRateSchema = new mongoose.Schema(
+  {
+    vehicleTypeId: { type: mongoose.Schema.Types.ObjectId, ref: 'TaxiVehicle', required: true },
+    baseFare: { type: Number, default: 0, min: 0 },
+    baseKm: { type: Number, default: 0, min: 0 },
+    perKm: { type: Number, default: 0, min: 0 },
+    perMinute: { type: Number, default: 0, min: 0 },
+    minimumFare: { type: Number, default: 0, min: 0 },
+  },
+  { _id: false },
+);
+
+const officeSchema = new mongoose.Schema({
+  name: { type: String, default: '', trim: true },
+  address: { type: String, default: '', trim: true },
+  location: {
+    type: { type: String, enum: ['Point'], default: 'Point' },
+    /// [lng, lat]
+    coordinates: { type: [Number], default: undefined },
+  },
+  radiusKm: { type: Number, default: 1, min: 0 },
+});
+
 const contactSchema = new mongoose.Schema(
   {
     name: { type: String, default: '', trim: true },
@@ -64,7 +92,8 @@ const corporateSchema = new mongoose.Schema(
     /// Per-company override of the global grace (percent of the limit). null
     /// means "use the business setting".
     creditGracePercent: { type: Number, default: null, min: 0 },
-    billingCycle: { type: String, enum: ['monthly'], default: 'monthly' },
+    /// 'weekly' = invoiced every Monday (IST) for the previous ISO week.
+    billingCycle: { type: String, enum: BILLING_CYCLES, default: 'monthly' },
     paymentTermsDays: { type: Number, default: 30, min: 0 },
     currentOutstanding: { type: Number, default: 0 },
     discount: {
@@ -83,6 +112,36 @@ const corporateSchema = new mongoose.Schema(
     /// business-setting default.
     approvalExpiryMinutes: { type: Number, default: null, min: 1 },
     notes: { type: String, default: '', trim: true },
+
+    // --- Corporate v2 (docs/plans/corporate-v2.md §1.3). Every block defaults
+    // off, so an existing company behaves exactly as before until configured.
+
+    /// The company's own rate card. When enabled, a company-billed trip of a
+    /// service in `appliesTo` is priced on it instead of Set Price.
+    tariff: {
+      enabled: { type: Boolean, default: false },
+      baseFare: { type: Number, default: 0, min: 0 },
+      baseKm: { type: Number, default: 0, min: 0 },
+      perKm: { type: Number, default: 0, min: 0 },
+      perMinute: { type: Number, default: 0, min: 0 },
+      minimumFare: { type: Number, default: 0, min: 0 },
+      byVehicleType: { type: [tariffRateSchema], default: [] },
+      appliesTo: { type: [{ type: String, enum: CORPORATE_SERVICES }], default: () => ['ride', 'intercity'] },
+    },
+    /// What the platform keeps from the driver on this company's trips.
+    driverCommission: {
+      enabled: { type: Boolean, default: false },
+      type: { type: String, enum: ['percentage', 'fixed'], default: 'percentage' },
+      value: { type: Number, default: 0, min: 0 },
+    },
+    travelZone: {
+      mode: { type: String, enum: TRAVEL_ZONE_MODES, default: 'free_roaming' },
+      rule: { type: String, enum: TRAVEL_ZONE_RULES, default: 'both_ends' },
+      offices: { type: [officeSchema], default: [] },
+    },
+    excessPayment: {
+      allowedMethods: { type: [{ type: String, enum: EXCESS_PAYMENT_METHODS }], default: () => [...EXCESS_PAYMENT_METHODS] },
+    },
   },
   { timestamps: true },
 );

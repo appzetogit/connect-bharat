@@ -39,6 +39,7 @@ import { Ride } from '../models/Ride.js';
 import { advancePaidAmount } from '../../outstation/services/outstationFare.js';
 import { findWebhookSettledRidePayment, recordFeedbackForSettledRidePayment } from '../../payments/services/paymentSettlementService.js';
 import { UserWallet } from '../models/UserWallet.js';
+import { corporateEmployeeAmountDue, markCorporateEmployeeSharePaid } from '../../corporate/services/corporateCompletionService.js';
 
 const EARTH_RADIUS_METERS = 6371000;
 const AVERAGE_CITY_SPEED_KMPH = 24;
@@ -104,7 +105,10 @@ const buildCompletionAmounts = (ride, tipAmount = 0) => {
   const fare = roundMoney(ride?.fare || 0);
   const normalizedTipAmount = roundMoney(tipAmount || 0);
   // An outstation advance paid at booking is not asked for again.
-  const fareDue = isDriverCollectionPaid(ride) ? 0 : Math.max(0, roundMoney(fare - advancePaidAmount(ride)));
+  // A corporate ride owes only the employee's excess-km share, and only when
+  // it is to be paid online / from the wallet (corporate v2).
+  const corporateDue = corporateEmployeeAmountDue(ride);
+  const fareDue = isDriverCollectionPaid(ride) ? 0 : corporateDue !== null ? corporateDue : Math.max(0, roundMoney(fare - advancePaidAmount(ride)));
   return {
     fare,
     fareDue,
@@ -220,7 +224,8 @@ const finalizeRideCompletion = async ({
   }
 
   if (fareDue > 0) {
-    ride.paymentMethod = 'online';
+    // A corporate ride stays corporate; its employee share is marked paid.
+    if (!markCorporateEmployeeSharePaid(ride, paymentRecord?.provider === 'wallet' ? 'wallet' : 'online')) ride.paymentMethod = 'online';
     ride.driverPaymentCollection = {
       provider: paymentRecord?.provider || ride.driverPaymentCollection?.provider || '',
       providerId: paymentRecord?.providerId || ride.driverPaymentCollection?.providerId || paymentRecord?.providerPaymentId || '',
@@ -301,7 +306,7 @@ export const razorpayRequest = async ({ method, path, body, keyId, keySecret }) 
 };
 
 export const createRide = async (req, res) => {
-  const { pickup, drop, pickupAddress, dropAddress, fare, estimatedDistanceMeters, estimatedDurationMinutes, vehicleTypeId, vehicleTypeIds, vehicleIconType, vehicleIconUrl, paymentMethod, serviceType, intercity, promo_code, zone_id, service_location_id, transport_type, scheduledAt, bookingMode, userMaxBidFare, bidStepAmount, platformFee } =
+  const { pickup, drop, pickupAddress, dropAddress, fare, estimatedDistanceMeters, estimatedDurationMinutes, vehicleTypeId, vehicleTypeIds, vehicleIconType, vehicleIconUrl, paymentMethod, serviceType, intercity, promo_code, zone_id, service_location_id, transport_type, scheduledAt, bookingMode, userMaxBidFare, bidStepAmount, platformFee, corporateId, employeePaymentMethod } =
     req.body;
 
   if (!pickup || !drop) {
@@ -341,6 +346,8 @@ export const createRide = async (req, res) => {
     userMaxBidFare,
     bidStepAmount,
     platformFee,
+    corporateId,
+    employeePaymentMethod,
   });
 
   await startDispatchFlow(ride);

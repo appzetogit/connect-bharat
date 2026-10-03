@@ -11,6 +11,9 @@ import { CorporateDepartment } from '../models/CorporateDepartment.js';
 import { CorporateEmployee } from '../models/CorporateEmployee.js';
 import { CorporateCounter, CorporateInvoice } from '../models/CorporateInvoice.js';
 import { renderCorporateInvoicePdf } from './corporateInvoicePdf.js';
+import { Vehicle } from '../../admin/models/Vehicle.js';
+import { CorporateRole } from '../models/CorporateRole.js';
+import { getIstWeekday, getPreviousIstWeekRange } from './corporateV2Rules.js';
 import { chargeCorporateAccount, recordCorporatePayment, reverseCorporateCharge } from './corporateLedger.js';
 import {
   buildAgingBuckets,
@@ -87,10 +90,43 @@ const loadRentalItems = async ({ corporate, from, to, invoiceId = null }) => {
           },
         ],
       })
-      .project({ _id: 1, corporateEmployeeId: 1, totalCost: 1, corporateBilledAmount: 1, completedAt: 1, updatedAt: 1, pickupDateTime: 1, returnDateTime: 1, vehicleName: 1, serviceLocation: 1 })
+      .project({ _id: 1, corporateEmployeeId: 1, totalCost: 1, corporateBilledAmount: 1, completedAt: 1, updatedAt: 1, pickupDateTime: 1, returnDateTime: 1, vehicleName: 1, serviceLocation: 1, corporateGrossAmount: 1, corporateDiscountAmount: 1, corporateSplit: 1, corporateAllowance: 1, corporateRoleId: 1, assignedAt: 1 })
       .toArray();
 
     return rentals.map((rental) => {
+      // v2: settled at completion by corporateRentalHook.js with the km split.
+      if (rental.corporateSplit) {
+        const split = rental.corporateSplit;
+        const allowance = rental.corporateAllowance || {};
+        const companyAmount = round2(split.companyAmount);
+        const billed = round2(rental.corporateBilledAmount ?? companyAmount);
+        return {
+          kind: 'rental',
+          refId: rental._id,
+          employeeId: rental.corporateEmployeeId || null,
+          roleId: rental.corporateRoleId || null,
+          date: rental.completedAt || rental.updatedAt,
+          serviceType: 'rental',
+          pickup: rental.vehicleName ? `Rental: ${rental.vehicleName}` : 'Rental',
+          drop: rental.serviceLocation?.name || '',
+          pickupAddress: rental.serviceLocation?.name || '',
+          dropAddress: rental.serviceLocation?.name || '',
+          vehicleName: rental.vehicleName || '',
+          startedAt: rental.assignedAt || rental.pickupDateTime || null,
+          completedAt: rental.completedAt || null,
+          actualKm: round2(allowance.actualKm),
+          coveredKm: round2(allowance.coveredKm),
+          excessKm: round2(allowance.excessKm),
+          grossFare: round2(rental.corporateGrossAmount ?? split.companyAmount + split.employeeAmount),
+          employeeAmount: round2(split.employeeAmount),
+          companyAmount,
+          grossAmount: companyAmount,
+          discountAmount: round2(companyAmount - billed),
+          netAmount: billed,
+          billedAmount: billed,
+          pricing: 'standard',
+        };
+      }
       const gross = round2(rental.totalCost || 0);
       const discount = computeCorporateDiscount({ discount: corporate.discount, serviceType: 'rental', fare: gross });
       const billed = rental.corporateBilledAmount !== undefined && rental.corporateBilledAmount !== null
@@ -104,9 +140,15 @@ const loadRentalItems = async ({ corporate, from, to, invoiceId = null }) => {
         serviceType: 'rental',
         pickup: rental.vehicleName ? `Rental: ${rental.vehicleName}` : 'Rental',
         drop: rental.serviceLocation?.name || '',
+        vehicleName: rental.vehicleName || '',
+        completedAt: rental.completedAt || null,
+        grossFare: gross,
+        companyAmount: gross,
         grossAmount: gross,
         discountAmount: round2(gross - billed),
         netAmount: billed,
+        billedAmount: billed,
+        pricing: 'standard',
       };
     });
   } catch (error) {
@@ -123,34 +165,68 @@ const loadRideItems = async ({ corporateId, from, to, invoiceId = null }) => {
     'corporate.chargedAt': { $gte: from, $lt: to },
     'corporate.invoiceId': { $in: invoiceId ? [null, invoiceId] : [null] },
   })
-    .select('_id fare serviceType pickupAddress dropAddress completedAt corporate')
+    .select('_id fare serviceType pickupAddress dropAddress startedAt completedAt corporate vehicleTypeId actualDistanceMeters estimatedDistanceMeters')
     .lean();
 
-  return rides.map((ride) => ({
-    kind: 'ride',
-    refId: ride._id,
-    employeeId: ride.corporate.employeeId,
-    departmentId: ride.corporate.departmentId || null,
-    date: ride.completedAt || ride.corporate.chargedAt,
-    serviceType: ride.serviceType || 'ride',
-    pickup: ride.pickupAddress || '',
-    drop: ride.dropAddress || '',
-    grossAmount: round2(ride.fare),
-    discountAmount: round2(ride.corporate.discountAmount),
-    netAmount: round2(ride.corporate.billedAmount),
-  }));
+  return rides.map((ride) => {
+    const split = ride.corporate.split || {};
+    const allowance = ride.corporate.allowance || {};
+    // The company's share (v2 split); the whole fare for rides billed before it.
+    const companyAmount = round2(split.stage === 'final' ? split.companyAmount : ride.fare);
+    const actualKm = round2(allowance.actualKm || (ride.actualDistanceMeters ?? ride.estimatedDistanceMeters ?? 0) / 1000);
+    return {
+      kind: 'ride',
+      refId: ride._id,
+      employeeId: ride.corporate.employeeId,
+      departmentId: ride.corporate.departmentId || null,
+      roleId: ride.corporate.roleId || null,
+      vehicleTypeId: ride.vehicleTypeId || null,
+      date: ride.completedAt || ride.corporate.chargedAt,
+      serviceType: ride.serviceType || 'ride',
+      pickup: ride.pickupAddress || '',
+      drop: ride.dropAddress || '',
+      pickupAddress: ride.pickupAddress || '',
+      dropAddress: ride.dropAddress || '',
+      startedAt: ride.startedAt || null,
+      completedAt: ride.completedAt || null,
+      actualKm,
+      coveredKm: round2(split.stage === 'final' ? allowance.coveredKm : actualKm),
+      excessKm: round2(split.stage === 'final' ? allowance.excessKm : 0),
+      grossFare: round2(ride.fare),
+      employeeAmount: round2(split.stage === 'final' ? split.employeeAmount : 0),
+      companyAmount,
+      grossAmount: companyAmount,
+      discountAmount: round2(ride.corporate.discountAmount),
+      netAmount: round2(ride.corporate.billedAmount),
+      billedAmount: round2(ride.corporate.billedAmount),
+      pricing: ride.corporate.pricing || 'standard',
+    };
+  });
 };
 
 /// Fills department and employee names onto annex items.
 const decorateItems = async (corporateId, items) => {
   const employeeIds = [...new Set(items.map((item) => item.employeeId).filter(Boolean).map(String))];
-  const employees = await CorporateEmployee.find({ _id: { $in: employeeIds } }).select('name employeeCode departmentId').lean();
+  const employees = await CorporateEmployee.find({ _id: { $in: employeeIds } }).select('name employeeCode departmentId roleId').lean();
   const employeeById = new Map(employees.map((item) => [String(item._id), item]));
+  const [roles, vehicles] = await Promise.all([
+    CorporateRole.find({ corporateId }).select('name code isDefault').lean(),
+    Vehicle.find({ _id: { $in: [...new Set(items.map((item) => item.vehicleTypeId).filter(Boolean).map(String))] } }).select('name').lean(),
+  ]);
+  const roleById = new Map(roles.map((role) => [String(role._id), role]));
+  const defaultRole = roles.find((role) => role.isDefault) || null;
+  const vehicleById = new Map(vehicles.map((vehicle) => [String(vehicle._id), vehicle]));
   for (const item of items) {
     const employee = item.employeeId ? employeeById.get(String(item.employeeId)) : null;
     item.employeeName = employee?.name || '';
     item.employeeCode = employee?.employeeCode || '';
     if (!item.departmentId && employee?.departmentId) item.departmentId = employee.departmentId;
+    // The role the trip was booked under, else the employee's current one.
+    const role = roleById.get(String(item.roleId || employee?.roleId || '')) || defaultRole;
+    item.roleId = role?._id || item.roleId || null;
+    item.roleName = role?.name || '';
+    item.roleCode = role?.code || '';
+    if (!item.vehicleName && item.vehicleTypeId) item.vehicleName = vehicleById.get(String(item.vehicleTypeId))?.name || '';
   }
 
   const departments = await CorporateDepartment.find({ corporateId }).select('name costCenter').lean();
@@ -498,34 +574,49 @@ export const markOverdueInvoices = async (now = new Date()) => {
   return result.modifiedCount || 0;
 };
 
-/// Monthly run, on days 1-3 of the IST month so a server that was down on the
-/// 1st still catches up. The (corporateId, periodKey) unique index makes it
-/// safe for every instance to run it.
+/// Background invoicing, per company by `billingCycle`:
+///   monthly: on days 1-3 of the IST month, for last month ('2026-09');
+///   weekly:  Monday-Wednesday (IST), for last ISO week ('2026-W40').
+/// The catch-up days cover a server that was down on the billing day. The
+/// (corporateId, periodKey) unique index makes it safe for every instance.
 export const runMonthlyInvoiceGeneration = async (now = new Date()) => {
   const settings = await getCorporateSettings();
   if (!isFlagOn(settings.auto_generate_invoices)) return { skipped: 'disabled' };
-  if (getIstClock(now).date > 3) return { skipped: 'not-billing-day' };
 
-  const { from, to, periodKey } = getPreviousIstMonthRange(now);
-  const corporates = await Corporate.find({ status: { $in: ['approved', 'suspended'] } }).select('_id').lean();
-  let generated = 0;
+  const cycles = [];
+  if (getIstClock(now).date <= 3) cycles.push({ cycle: 'monthly', ...getPreviousIstMonthRange(now) });
+  if (getIstWeekday(now) <= 2) cycles.push({ cycle: 'weekly', ...getPreviousIstWeekRange(now) });
+  if (!cycles.length) return { skipped: 'not-billing-day' };
 
-  for (const { _id } of corporates) {
-    const exists = await CorporateInvoice.exists({ corporateId: _id, periodKey });
-    if (exists) continue;
-    try {
-      const invoice = await generateCorporateInvoice({ corporateId: _id, from, to, periodKey, generatedBy: 'monthly-job', skipEmpty: true });
-      if (!invoice) continue;
-      generated += 1;
-      if (isFlagOn(settings.auto_issue_invoices) && invoice.tripCount > 0) {
-        await issueCorporateInvoice({ invoiceId: invoice._id, email: true });
+  const result = { generated: 0, periodKeys: [] };
+  for (const { cycle, from, to, periodKey } of cycles) {
+    const filter = { status: { $in: ['approved', 'suspended'] } };
+    filter.billingCycle = cycle === 'weekly' ? 'weekly' : { $ne: 'weekly' };
+    const corporates = await Corporate.find(filter).select('_id').lean();
+    result.periodKeys.push(periodKey);
+
+    for (const { _id } of corporates) {
+      const exists = await CorporateInvoice.exists({ corporateId: _id, periodKey });
+      if (exists) continue;
+      try {
+        const invoice = await generateCorporateInvoice({ corporateId: _id, from, to, periodKey, generatedBy: `${cycle}-job`, skipEmpty: true });
+        if (!invoice) continue;
+        result.generated += 1;
+        if (isFlagOn(settings.auto_issue_invoices) && invoice.tripCount > 0) {
+          await issueCorporateInvoice({ invoiceId: invoice._id, email: true });
+        }
+      } catch (error) {
+        if (error?.statusCode !== 409) console.warn(`[corporate-invoice] ${cycle} generation failed`, String(_id), error.message);
       }
-    } catch (error) {
-      if (error?.statusCode !== 409) console.warn('[corporate-invoice] monthly generation failed', String(_id), error.message);
     }
   }
-  return { generated, periodKey };
+  // Kept for callers that read the single key.
+  result.periodKey = result.periodKeys[0];
+  return result;
 };
+
+/// Alias with the clearer name; the job calls this.
+export const runScheduledInvoiceGeneration = runMonthlyInvoiceGeneration;
 
 export const syncOpenPaymentLinks = async ({ limit = 20 } = {}) => {
   const invoices = await CorporateInvoice.find({

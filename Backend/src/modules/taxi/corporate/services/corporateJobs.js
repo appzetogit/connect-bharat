@@ -1,5 +1,6 @@
 import { expirePendingTripRequests } from './corporateApprovalService.js';
-import { markOverdueInvoices, runMonthlyInvoiceGeneration, syncOpenPaymentLinks } from './corporateInvoiceService.js';
+import { markOverdueInvoices, runScheduledInvoiceGeneration, syncOpenPaymentLinks } from './corporateInvoiceService.js';
+import { sweepStaleAllowanceReservations } from './corporateAllowanceService.js';
 
 /// Background sweeps for the corporate module, on the same pattern as
 /// driverSubscriptionExpiryService: a polling interval, every step safe to run
@@ -22,9 +23,11 @@ export const runCorporateSweep = async ({ includeSlow = false } = {}) => {
   const now = new Date();
   const result = {};
   result.approvals = await expirePendingTripRequests({ now }).catch((error) => ({ error: error.message }));
+  // Km held for corporate rides cancelled by a path with no release hook.
+  result.allowance = await sweepStaleAllowanceReservations().catch((error) => ({ error: error.message }));
   if (includeSlow) {
     result.overdue = await markOverdueInvoices(now).catch((error) => ({ error: error.message }));
-    result.monthly = await runMonthlyInvoiceGeneration(now).catch((error) => ({ error: error.message }));
+    result.invoices = await runScheduledInvoiceGeneration(now).catch((error) => ({ error: error.message }));
     result.paymentLinks = await syncOpenPaymentLinks().catch((error) => ({ error: error.message }));
   }
   return result;

@@ -11,6 +11,7 @@ import {
   resolveBookingFare,
   resolveSetPriceForRide,
 } from './rideService.js';
+import { buildCorporateEstimateQuote, loadCorporateEstimateContext } from '../corporate/services/corporatePricingService.js';
 
 /// Fare estimate before booking: `POST /rides/estimate`.
 ///
@@ -171,6 +172,9 @@ export const estimateRideFares = async ({
   promo_code,
   estimatedDistanceMeters,
   estimatedDurationMinutes,
+  // Corporate v2: with 'corporate', each quote gains a `corporate` block.
+  paymentMethod = null,
+  corporateId = null,
 } = {}) => {
   if (!pickup || !drop) {
     throw new ApiError(400, 'pickup and drop are required');
@@ -232,6 +236,10 @@ export const estimateRideFares = async ({
   const vehicleById = new Map(vehicles.map((vehicle) => [String(vehicle._id), vehicle]));
   const promoCode = typeof promo_code === 'string' ? promo_code.trim() : '';
   const promoServiceLocationId = service_location_id || resolvedServiceLocationId;
+
+  const corporateContext = String(paymentMethod || '').trim().toLowerCase() === 'corporate'
+    ? await loadCorporateEstimateContext({ userId, corporateId, pickup: pickupCoords, drop: dropCoords, at })
+    : null;
 
   const quotes = [];
   for (const id of ids) {
@@ -296,6 +304,9 @@ export const estimateRideFares = async ({
           })
         : null,
     });
+    if (corporateContext) {
+      quotes[quotes.length - 1].corporate = buildCorporateEstimateQuote(corporateContext, { vehicleTypeId: id, pricingRule, fare: serverFare, fareSource, fareBreakdown, distanceMeters, durationMinutes, serviceType: normalizedServiceType, intercity });
+    }
   }
 
   return {

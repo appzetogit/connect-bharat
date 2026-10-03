@@ -24,6 +24,59 @@ export const rideCorporateSchema = new mongoose.Schema(
     chargedAt: { type: Date, default: null },
     billed: { type: Boolean, default: false },
     invoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'TaxiCorporateInvoice', default: null },
+
+    // --- Corporate v2 (docs/plans/corporate-v2.md §1.4) ---
+    roleId: { type: mongoose.Schema.Types.ObjectId, ref: 'TaxiCorporateRole', default: null },
+    /// Set on travel-desk bookings (a panel user booked for the employee).
+    bookedByCorporateAdminId: { type: mongoose.Schema.Types.ObjectId, ref: 'TaxiCorporateAdmin', default: null },
+    bookingNote: { type: String, default: '', trim: true },
+    /// 'company_tariff' when the fare came from Corporate.tariff.
+    pricing: { type: String, enum: ['company_tariff', 'standard'], default: 'standard' },
+    /// The commission override the trip was booked under (audit copy; the
+    /// figures settlement uses are written into pricingSnapshot).
+    driverCommission: {
+      type: new mongoose.Schema(
+        { type: { type: String, default: '' }, value: { type: Number, default: 0 } },
+        { _id: false },
+      ),
+      default: undefined,
+    },
+    allowance: {
+      type: new mongoose.Schema(
+        {
+          enabled: { type: Boolean, default: false },
+          period: { type: String, default: '' },
+          periodKey: { type: String, default: '' },
+          allowanceKm: { type: Number, default: 0 },
+          remainingKmAtBooking: { type: Number, default: 0 },
+          estimatedKm: { type: Number, default: 0 },
+          /// Km held on CorporateAllowanceUsage.reservedKm for this ride while
+          /// `reservationOpen`; released once, on completion or cancellation.
+          reservedKm: { type: Number, default: 0 },
+          reservationOpen: { type: Boolean, default: false },
+          actualKm: { type: Number, default: 0 },
+          coveredKm: { type: Number, default: 0 },
+          excessKm: { type: Number, default: 0 },
+          settledAt: { type: Date, default: null },
+        },
+        { _id: false },
+      ),
+      default: undefined,
+    },
+    split: {
+      type: new mongoose.Schema(
+        {
+          companyAmount: { type: Number, default: 0 },
+          employeeAmount: { type: Number, default: 0 },
+          employeePaymentMethod: { type: String, enum: ['cash', 'online', 'wallet', ''], default: '' },
+          employeePaymentStatus: { type: String, enum: ['not_required', 'pending', 'paid'], default: 'not_required' },
+          /// 'estimate' at booking, 'final' once completion recomputed it.
+          stage: { type: String, default: 'estimate' },
+        },
+        { _id: false },
+      ),
+      default: undefined,
+    },
   },
   { _id: false },
 );

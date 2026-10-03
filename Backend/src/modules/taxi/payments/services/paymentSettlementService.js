@@ -13,6 +13,7 @@ import { Ride } from '../../user/models/Ride.js';
 import { UserWallet } from '../../user/models/UserWallet.js';
 import { PaymentOrder } from '../models/PaymentOrder.js';
 import { roundMoney } from '../utils/paymentUtils.js';
+import { corporateEmployeePaidUpdate } from '../../corporate/services/corporateCompletionService.js';
 
 /// Settles a captured gateway payment into the app: wallet credit, ride
 /// payment, bus seat confirmation.
@@ -408,7 +409,10 @@ export const settleRideGatewayPayment = async ({
 
       const update = {};
       if (fareDue > 0) {
-        update.paymentMethod = 'online';
+        // A corporate ride stays corporate; the employee's share is marked paid.
+        const corporatePaid = corporateEmployeePaidUpdate(ride, 'online');
+        if (corporatePaid) Object.assign(update, corporatePaid);
+        else update.paymentMethod = 'online';
         update.driverPaymentCollection = {
           provider,
           providerId: String(paymentId),

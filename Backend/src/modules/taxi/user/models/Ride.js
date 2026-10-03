@@ -437,6 +437,10 @@ const rideSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    /// Set at completion on every ride: odometer delta > GPS trail > routed
+    /// estimate (services/rideActualDistanceService.js).
+    actualDistanceMeters: { type: Number, default: null, min: 0 },
+    actualDistanceSource: { type: String, enum: ['odometer', 'gps', 'estimate', null], default: null },
     paymentMethod: {
       type: String,
       // 'corporate' = billed to the rider's company credit account; never
@@ -845,6 +849,11 @@ rideSchema.index({ driverId: 1, scheduledAt: 1, status: 1, liveStatus: 1 });
 rideSchema.index(
   { 'corporate.corporateId': 1, status: 1, completedAt: -1 },
   { partialFilterExpression: { 'corporate.corporateId': { $exists: true } } },
+);
+// Corporate v2: the sweep that releases km held by cancelled rides.
+rideSchema.index(
+  { status: 1, 'corporate.allowance.reservationOpen': 1 },
+  { partialFilterExpression: { 'corporate.allowance.reservationOpen': true } },
 );
 
 /// Every parcel gets its receiver OTP at booking, whichever path creates it.

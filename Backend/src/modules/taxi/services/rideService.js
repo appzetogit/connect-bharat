@@ -32,6 +32,9 @@ import { enforceTripOtp, notifyParcelReceiverOtp } from './tripOtpService.js';
 import { publishRideLifecycle } from '../admin/operations/adminFeedService.js';
 import { attachCorporateBookingToRide, validateCorporateBooking } from '../corporate/services/corporateBookingService.js';
 import { recordCorporateRideCompletion } from '../corporate/services/corporateBillingService.js';
+import { settleCorporateRideAtCompletion } from '../corporate/services/corporateCompletionService.js';
+import { releaseRideAllowanceLater } from '../corporate/services/corporateAllowanceService.js';
+import { applyRideActualDistance } from './rideActualDistanceService.js';
 import { onParcelRideCompleted } from '../logistics/services/rideHooks.js';
 
 const clearUserActiveRideIfPresent = async (user) => {
@@ -56,6 +59,7 @@ const clearUserActiveRideIfPresent = async (user) => {
   activeRide.status = RIDE_STATUS.CANCELLED;
   activeRide.liveStatus = RIDE_LIVE_STATUS.CANCELLED;
   await activeRide.save();
+  releaseRideAllowanceLater(activeRide);
   await syncDeliveryWithRide(activeRide);
 
   await Promise.all([
@@ -1186,6 +1190,11 @@ export const createRideRecord = async ({
   // Set only by server code that has already priced the trip itself (the
   // parcel tariff). A fare arriving from an app never sets this.
   serverPricedFareSource = null,
+  // Corporate v2: which company (rider in several), how the employee pays any
+  // excess km, and the panel user for a travel-desk booking.
+  corporateId = null,
+  employeePaymentMethod = '',
+  corporateBooker = null,
 }) => {
   const user = await User.findById(userId);
 
@@ -1300,7 +1309,7 @@ export const createRideRecord = async ({
   });
 
   // Throws 403 when the company may not be billed (policy, limits, credit).
-  const corporateBooking = resolvedRequestedPaymentMethod === 'corporate' ? await validateCorporateBooking({ userId, serviceType: normalizedServiceType, vehicleTypeId: primaryVehicleTypeId, fare: safeFare, scheduledAt: normalizedScheduledAt }) : null;
+  const corporateBooking = resolvedRequestedPaymentMethod === 'corporate' ? await validateCorporateBooking({ userId, serviceType: normalizedServiceType, vehicleTypeId: primaryVehicleTypeId, fare: safeFare, scheduledAt: normalizedScheduledAt, corporateId, fareSource, fareBreakdown, pricingRule, distanceMeters: routedDistanceMeters, durationMinutes: routedDurationMinutes, intercity: normalizeIntercityPayload(intercity), pickupCoords, dropCoords, employeePaymentMethod, booker: corporateBooker }) : null;
 
   const bidRideSettings = await getBidRideSettings();
   const fareIncreaseWaitMinutes = toPositiveNumber(
@@ -2225,6 +2234,7 @@ export const updateRideLifecycle = async ({ rideId, driverId, nextStatus, paymen
     ride.completedAt = new Date();
     await applyParcelWaitingCharge(ride);
     await applyOutstationFinalFare(ride);
+    await applyRideActualDistance(ride);
   }
 
   await ride.save();
@@ -2245,6 +2255,8 @@ export const updateRideLifecycle = async ({ rideId, driverId, nextStatus, paymen
       Driver.findByIdAndUpdate(driverId, { isOnRide: false }),
     ]);
 
+    // Final company / employee split first: wallet settlement reads it.
+    if (ride.paymentMethod === 'corporate') await settleCorporateRideAtCompletion({ rideId: ride._id });
     walletUpdate = await settleCompletedRideWallet({ rideId: ride._id });
     if (ride.paymentMethod === 'corporate') await recordCorporateRideCompletion({ rideId: ride._id });
     await consumeUserSubscriptionRide({ ride });

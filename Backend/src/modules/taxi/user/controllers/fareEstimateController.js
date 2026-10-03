@@ -19,6 +19,8 @@ export const estimateRide = async (req, res) => {
     promo_code: body.promo_code,
     estimatedDistanceMeters: body.estimatedDistanceMeters,
     estimatedDurationMinutes: body.estimatedDurationMinutes,
+    paymentMethod: body.paymentMethod,
+    corporateId: body.corporateId,
   });
 
   res.json({ success: true, data });

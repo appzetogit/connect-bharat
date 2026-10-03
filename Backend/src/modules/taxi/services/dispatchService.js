@@ -22,6 +22,7 @@ import { resolveTransportDispatchConfig } from './transportSettingsService.js';
 import { sendPushNotificationToEntities } from './pushNotificationService.js';
 import { lifecycleEventForAcceptedRide, publishRideCancelled, publishRideLifecycle } from '../admin/operations/adminFeedService.js';
 import { isRideAwaitingCorporateApproval } from '../corporate/services/corporateDispatchGate.js';
+import { releaseRideAllowanceLater } from '../corporate/services/corporateAllowanceService.js';
 
 const activeDispatches = new Map();
 let ioInstance = null;
@@ -958,6 +959,7 @@ const closeRideAsUnmatched = async (rideId) => {
     liveStatus: ride.liveStatus,
   });
   publishRideCancelled(ride, 'system', { reason: 'unmatched' });
+  releaseRideAllowanceLater(ride); // corporate km reservation, no-op otherwise
 };
 
 export const cancelRideByAdmin = async (rideId) => {
@@ -1018,6 +1020,7 @@ export const cancelRideByAdmin = async (rideId) => {
 
   stopDispatchFlow(rideId);
   publishRideCancelled(ride, 'admin');
+  releaseRideAllowanceLater(ride); // corporate km reservation, no-op otherwise
   return ride;
 };
 
@@ -1160,6 +1163,7 @@ export const cancelRideByUser = async ({ rideId, userId }) => {
 
   stopDispatchFlow(rideId);
   publishRideCancelled(ride, 'user');
+  releaseRideAllowanceLater(ride); // corporate km reservation, no-op otherwise
   return ride;
 };
 
@@ -1312,6 +1316,7 @@ export const cancelScheduledRideByDriver = async ({ rideId, driverId }) => {
 
   stopDispatchFlow(rideId);
   publishRideCancelled(ride, 'driver');
+  releaseRideAllowanceLater(ride); // corporate km reservation, no-op otherwise
   return ride;
 };
 

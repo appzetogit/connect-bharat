@@ -9,6 +9,7 @@ import { Ride } from '../../user/models/Ride.js';
 import { DriverSubscription } from '../models/DriverSubscription.js';
 import { getWalletSettings } from '../../services/appSettingsService.js';
 import { advancePaidAmount } from '../../outstation/services/outstationFare.js';
+import { computeCorporateDriverWalletCredit } from '../../corporate/services/corporateV2Rules.js';
 import {
   getActiveDriverSubscription,
   getDriverVehicleClasses,
@@ -486,8 +487,11 @@ export const settleCompletedRideWallet = async ({ rideId }) => {
     // An outstation advance was collected online by admin, so on a cash ride
     // the driver only took fare - advance in hand and is owed the advance back.
     const advancePaid = Math.min(advancePaidAmount(ride), fare);
-    const amount = paymentMethod === 'cash' ? Math.round((advancePaid - commissionAmount) * 100) / 100 : driverEarnings;
-    const type = paymentMethod === 'cash' && amount < 0 ? 'commission_deduction' : 'ride_earning';
+    // Corporate ride whose employee paid the excess km share in cash to the
+    // driver: credit fare - commission - that cash (corporateV2Rules.js).
+    const corporateCredit = paymentMethod === 'corporate' ? computeCorporateDriverWalletCredit({ driverEarnings, split: ride.corporate?.split }) : null;
+    const amount = paymentMethod === 'cash' ? Math.round((advancePaid - commissionAmount) * 100) / 100 : (corporateCredit ? corporateCredit.amount : driverEarnings);
+    const type = paymentMethod === 'cash' && amount < 0 ? 'commission_deduction' : (corporateCredit ? corporateCredit.type : 'ride_earning');
 
     ride.paymentMethod = paymentMethod;
     ride.commissionAmount = commissionAmount;
@@ -543,6 +547,7 @@ export const settleCompletedRideWallet = async ({ rideId }) => {
         platformFee,
         subscriptionId: coveringSubscription ? String(coveringSubscription._id) : null,
         commissionWaived: waivedCommission,
+        ...(corporateCredit?.cashCollected ? { corporateEmployeeCashCollected: corporateCredit.cashCollected } : {}),
       },
       session,
     });

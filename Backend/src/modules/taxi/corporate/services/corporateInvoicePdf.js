@@ -167,6 +167,41 @@ export const renderCorporateInvoicePdf = ({ invoice, corporate, supplier }) =>
       totalRow('Paid', invoice.amountPaid);
       totalRow('Balance due', invoice.balanceDue, true);
     }
+    if (Number(invoice.employeePaidTotal) > 0) {
+      ensureSpace(16);
+      doc.font(FONTS.regular).fontSize(8.5).fillColor(MUTED)
+        .text(`Paid by employees for km over their allowance (not billed here): ${money(invoice.employeePaidTotal)}`, left, y, { width });
+      y += 16;
+    }
+
+    // --- role summary (v2) -----------------------------------------------
+    if ((invoice.byRole || []).length) {
+      ensureSpace(60);
+      y += 6;
+      doc.font(FONTS.bold).fontSize(10).fillColor(INK).text('Summary by role', left, y);
+      y += 16;
+      const roleCols = [
+        { label: 'Role', x: left, w: width * 0.28, align: 'left' },
+        { label: 'Trips', x: left + width * 0.28, w: width * 0.09, align: 'right' },
+        { label: 'Km', x: left + width * 0.37, w: width * 0.11, align: 'right' },
+        { label: 'Covered km', x: left + width * 0.48, w: width * 0.13, align: 'right' },
+        { label: 'Excess km', x: left + width * 0.61, w: width * 0.12, align: 'right' },
+        { label: 'Employee paid', x: left + width * 0.73, w: width * 0.13, align: 'right' },
+        { label: 'Billed', x: left + width * 0.86, w: width * 0.14, align: 'right' },
+      ];
+      doc.font(FONTS.bold).fontSize(7.5).fillColor(MUTED);
+      roleCols.forEach((col) => doc.text(col.label.toUpperCase(), col.x, y, { width: col.w, align: col.align }));
+      y += 12;
+      rule();
+      y += 5;
+      for (const row of invoice.byRole) {
+        ensureSpace(15);
+        const values = [row.roleName || '-', String(row.trips || 0), String(row.km || 0), String(row.coveredKm || 0), String(row.excessKm || 0), money(row.employeeAmount), money(row.billedAmount)];
+        doc.font(FONTS.regular).fontSize(8.5).fillColor(INK);
+        roleCols.forEach((col, index) => doc.text(values[index], col.x, y, { width: col.w, align: col.align, lineBreak: false, ellipsis: true }));
+        y += 14;
+      }
+    }
 
     // --- annex ------------------------------------------------------------
     if ((invoice.annex || []).length) {
@@ -175,12 +210,14 @@ export const renderCorporateInvoicePdf = ({ invoice, corporate, supplier }) =>
       doc.font(FONTS.bold).fontSize(12).fillColor(INK).text(`Annexure: trip details (${invoice.invoiceNumber})`, left, y);
       y += 22;
       const annexCols = [
-        { label: 'Date', x: left, w: width * 0.11, align: 'left' },
-        { label: 'Employee', x: left + width * 0.11, w: width * 0.17, align: 'left' },
-        { label: 'Dept', x: left + width * 0.28, w: width * 0.11, align: 'left' },
-        { label: 'Service', x: left + width * 0.39, w: width * 0.08, align: 'left' },
-        { label: 'Route', x: left + width * 0.47, w: width * 0.31, align: 'left' },
-        { label: 'Net', x: left + width * 0.78, w: width * 0.22, align: 'right' },
+        { label: 'Date', x: left, w: width * 0.09, align: 'left' },
+        { label: 'Employee', x: left + width * 0.09, w: width * 0.15, align: 'left' },
+        { label: 'Role', x: left + width * 0.24, w: width * 0.08, align: 'left' },
+        { label: 'Service', x: left + width * 0.32, w: width * 0.07, align: 'left' },
+        { label: 'Route', x: left + width * 0.39, w: width * 0.25, align: 'left' },
+        { label: 'Km (cov/exc)', x: left + width * 0.64, w: width * 0.11, align: 'right' },
+        { label: 'Emp paid', x: left + width * 0.75, w: width * 0.11, align: 'right' },
+        { label: 'Billed', x: left + width * 0.86, w: width * 0.14, align: 'right' },
       ];
       const annexHeader = () => {
         doc.font(FONTS.bold).fontSize(7.5).fillColor(MUTED);
@@ -200,9 +237,11 @@ export const renderCorporateInvoicePdf = ({ invoice, corporate, supplier }) =>
         const values = [
           fmtDate(item.date),
           `${item.employeeName || '-'}${item.employeeCode ? ` (${item.employeeCode})` : ''}`,
-          item.departmentName || '-',
+          item.roleName || '-',
           item.kind === 'rental' ? 'rental' : item.serviceType,
           FONTS.unicode ? route : route.replace('→', '->'),
+          `${Number(item.actualKm || 0)} (${Number(item.coveredKm || 0)}/${Number(item.excessKm || 0)})`,
+          Number(item.employeeAmount) > 0 ? money(item.employeeAmount) : '-',
           money(item.netAmount),
         ];
         doc.font(FONTS.regular).fontSize(7.5).fillColor(INK);

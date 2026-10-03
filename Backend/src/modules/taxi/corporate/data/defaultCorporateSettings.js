@@ -51,4 +51,15 @@ export const createDefaultCorporateSettings = () => ({
   approver_sms_template_id: '',
   approver_sms_text: '{employee} has requested a {service} trip of Rs {amount}. Approve it in the {app} corporate panel.',
   approver_email_enabled: '1',
+  // --- Corporate v2 master switches (docs/plans/corporate-v2.md §4). Each
+  // only gates a per-company setting that itself defaults off, so these
+  // being on changes nothing until a company is configured.
+  /// Role km allowances (and so the employee-paid excess split).
+  allowance_enabled: '1',
+  /// Company tariffs (Corporate.tariff).
+  tariff_enabled: '1',
+  /// Office boundaries (Corporate.travelZone).
+  travel_zone_enabled: '1',
+  /// Panel bookings for employees (POST /corporate/bookings).
+  travel_desk_enabled: '1',
 });

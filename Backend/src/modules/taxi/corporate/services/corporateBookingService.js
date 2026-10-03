@@ -9,13 +9,33 @@ import { CorporateTripPolicy } from '../models/CorporateTripPolicy.js';
 import {
   checkCreditLimit,
   computeCorporateDiscount,
+  employeePolicyLayer,
   evaluateTripPolicy,
   getIstMonthRange,
   mergePolicies,
   normalizeCorporateServiceType,
+  resolveEmployeeMonthlyLimit,
+  rolePolicyLayer,
   round2,
 } from './corporatePolicyEngine.js';
 import { getCorporateSettings, isFlagOn } from './corporateSettingsService.js';
+import {
+  computeCorporateSplit,
+  defaultEmployeePaymentMethod,
+  estimateTripKm,
+  normalizeExcessMethods,
+  resolveEmployeePaymentMethod,
+  serializeOffices,
+} from './corporateV2Rules.js';
+import {
+  getAllowanceSnapshot,
+  releaseReservationForUnsavedRide,
+  reserveAllowanceKm,
+  upsertAllowanceUsage,
+} from './corporateAllowanceService.js';
+import { findActiveMembership } from './corporateMembership.js';
+import { assertTravelZone, corporateApiError, priceCorporateTrip } from './corporatePricingService.js';
+import { resolveEmployeeRole, serializeRoleRef } from './corporateRoleService.js';
 
 /// Rides that have been booked against a company but not yet charged to it.
 /// Their billable amount counts against the credit limit and monthly caps so
@@ -58,29 +78,19 @@ const sumPendingExposure = async (corporateId) => {
   return round2(row?.total || 0);
 };
 
-const loadPolicy = async ({ corporateId, departmentId }) => {
+const loadPolicy = async ({ corporateId, departmentId, role = null, employee = null }) => {
   const policies = await CorporateTripPolicy.find({
     corporateId,
     departmentId: { $in: departmentId ? [null, departmentId] : [null] },
   }).lean();
   const company = policies.find((item) => !item.departmentId) || null;
   const department = departmentId ? policies.find((item) => String(item.departmentId) === String(departmentId)) || null : null;
-  return mergePolicies(company, department);
+  return mergePolicies(company, department, rolePolicyLayer(role), employeePolicyLayer(employee));
 };
 
-/// The membership a rider books under. A rider can belong to more than one
-/// company; without an explicit `corporateId` the oldest active one is used.
-export const findActiveMembership = async ({ userId, corporateId = null }) => {
-  const filter = { userId, active: true };
-  if (corporateId && mongoose.Types.ObjectId.isValid(String(corporateId))) filter.corporateId = corporateId;
-  const employees = await CorporateEmployee.find(filter).sort({ createdAt: 1 }).lean();
-  if (!employees.length) return null;
+export { findActiveMembership };
 
-  const corporates = await Corporate.find({ _id: { $in: employees.map((item) => item.corporateId) } }).lean();
-  const byId = new Map(corporates.map((item) => [String(item._id), item]));
-  const employee = employees.find((item) => byId.get(String(item.corporateId))?.status === 'approved') || employees[0];
-  return { employee, corporate: byId.get(String(employee.corporateId)) || null };
-};
+const PANEL_BOOKERS_WITHOUT_APPROVAL = ['owner', 'admin', 'approver'];
 
 /// Decides whether a booking may be billed to the rider's company.
 ///
@@ -88,7 +98,35 @@ export const findActiveMembership = async ({ userId, corporateId = null }) => {
 /// ApiError(403) with the reasons when the trip is not allowed; otherwise
 /// returns what the ride needs to store, including whether dispatch must wait
 /// for an approver.
-export const validateCorporateBooking = async ({ userId, serviceType, vehicleTypeId, fare, scheduledAt, corporateId = null }) => {
+///
+/// v2 (docs/plans/corporate-v2.md): prices on the company tariff when it is on
+/// (the returned `grossFare` then replaces the Set Price fare), enforces the
+/// office boundary, merges the role's travel rules, works out the estimated
+/// company / employee split from the role's km allowance and validates the
+/// employee's payment method for any excess. Policy, monthly caps and the
+/// credit limit are checked on the company's share after discount. Nothing is
+/// written here; the allowance is reserved in attachCorporateBookingToRide.
+///
+/// `booker` = { adminId, role, note } for a travel-desk booking: owner /
+/// admin / approver bookings skip the approval step.
+export const validateCorporateBooking = async ({
+  userId,
+  serviceType,
+  vehicleTypeId,
+  fare,
+  scheduledAt,
+  corporateId = null,
+  fareSource = 'server',
+  fareBreakdown = null,
+  pricingRule = null,
+  distanceMeters = 0,
+  durationMinutes = 0,
+  intercity = null,
+  pickupCoords = null,
+  dropCoords = null,
+  employeePaymentMethod = '',
+  booker = null,
+}) => {
   const settings = await getCorporateSettings();
   if (!isFlagOn(settings.booking_enabled)) {
     throw new ApiError(403, 'Corporate billing is not available right now');
@@ -104,12 +142,59 @@ export const validateCorporateBooking = async ({ userId, serviceType, vehicleTyp
   }
 
   const service = normalizeCorporateServiceType(serviceType);
-  const grossFare = Math.max(0, Number(fare) || 0);
-  const discount = computeCorporateDiscount({ discount: corporate.discount, serviceType: service, fare: grossFare });
+  if (pickupCoords && dropCoords) {
+    assertTravelZone({ corporate, settings, pickup: pickupCoords, drop: dropCoords });
+  }
+
+  const priced = priceCorporateTrip({
+    corporate,
+    settings,
+    serviceType: service,
+    vehicleTypeId,
+    distanceMeters,
+    durationMinutes,
+    intercity,
+    pricingRule,
+    standardFare: fare,
+    standardFareSource: fareSource,
+    standardBreakdown: fareBreakdown,
+  });
+  const grossFare = Math.max(0, Number(priced.fare) || 0);
+  if (booker && !(grossFare > 0)) {
+    throw new ApiError(400, 'This vehicle cannot be priced for this trip');
+  }
+
+  const role = await resolveEmployeeRole(employee);
+  const at = scheduledAt || new Date();
+  const allowanceSnapshot = await getAllowanceSnapshot({ employee, role, settings, at });
+  const estimatedKm = estimateTripKm({ distanceMeters, serviceType: service, tripType: intercity?.tripType });
+  const split = computeCorporateSplit({
+    fare: grossFare,
+    km: estimatedKm,
+    remainingKm: allowanceSnapshot.remainingKm,
+    allowanceEnabled: allowanceSnapshot.enabled,
+  });
+
+  const allowedMethods = normalizeExcessMethods(corporate.excessPayment?.allowedMethods);
+  const payment = resolveEmployeePaymentMethod({
+    requested: employeePaymentMethod,
+    allowedMethods,
+    required: split.employeeAmount > 0,
+  });
+  if (!payment.ok) {
+    throw corporateApiError(400, payment.reason, {
+      code: 'corporate_employee_payment_method',
+      allowedMethods,
+      employeeAmount: split.employeeAmount,
+      companyAmount: split.companyAmount,
+    });
+  }
+
+  const discount = computeCorporateDiscount({ discount: corporate.discount, serviceType: service, fare: split.companyAmount });
 
   const [department, policy, employeeMonthSpend, pendingExposure] = await Promise.all([
     employee.departmentId ? CorporateDepartment.findById(employee.departmentId).lean() : null,
-    loadPolicy({ corporateId: corporate._id, departmentId: employee.departmentId }),
+    loadPolicy({ corporateId: corporate._id, departmentId: employee.departmentId, role, employee }),
     sumCorporateSpend({ 'corporate.employeeId': toObjectId(employee._id) }),
     sumPendingExposure(corporate._id),
   ]);
@@ -120,9 +205,9 @@ export const validateCorporateBooking = async ({ userId, serviceType, vehicleTyp
   const evaluation = evaluateTripPolicy({
     corporate,
     policy,
-    employee,
+    employee: { ...employee, monthlyLimit: resolveEmployeeMonthlyLimit({ employee, role }) },
     department,
-    trip: { serviceType: service, vehicleTypeId, fare: discount.billableAmount, at: scheduledAt || new Date() },
+    trip: { serviceType: service, vehicleTypeId, fare: discount.billableAmount, at },
     spend: { employeeMonthSpend, departmentMonthSpend },
   });
 
@@ -149,20 +234,99 @@ export const validateCorporateBooking = async ({ userId, serviceType, vehicleTyp
     throw new ApiError(403, credit.reason, { credit });
   }
 
+  const skipApproval = Boolean(booker && PANEL_BOOKERS_WITHOUT_APPROVAL.includes(booker.role));
+
   return {
     corporateId: corporate._id,
     corporateName: corporate.name,
     employeeId: employee._id,
+    employeeUserId: employee.userId,
     departmentId: employee.departmentId || null,
+    roleId: role?._id || null,
     serviceType: service,
     grossFare: round2(grossFare),
-    discount: { type: discount.type, value: discount.value, amount: discount.amount },
+    pricing: priced.pricing,
+    fareSource: priced.fareSource,
+    fareBreakdown: priced.fareBreakdown,
+    discount: {
+      type: discount.type,
+      value: discount.value,
+      amount: discount.amount,
+      maxPerTrip: corporate.discount?.maxPerTrip,
+      appliesTo: corporate.discount?.appliesTo,
+    },
     discountAmount: discount.amount,
     billableAmount: discount.billableAmount,
-    requiresApproval: evaluation.requiresApproval,
-    approvalReasons: evaluation.approvalReasons,
+    allowance: {
+      enabled: allowanceSnapshot.enabled,
+      period: allowanceSnapshot.period,
+      periodKey: allowanceSnapshot.enabled ? allowanceSnapshot.periodKey : '',
+      allowanceKm: allowanceSnapshot.allowanceKm,
+      remainingKmAtBooking: allowanceSnapshot.remainingKm,
+      estimatedKm,
+      coveredKm: split.coveredKm,
+      excessKm: split.excessKm,
+    },
+    split: {
+      companyAmount: split.companyAmount,
+      employeeAmount: split.employeeAmount,
+      employeePaymentMethod: payment.method,
+    },
+    allowedMethods,
+    driverCommission: corporate.driverCommission?.enabled
+      ? {
+          type: corporate.driverCommission.type === 'fixed' ? 'fixed' : 'percentage',
+          value: Math.max(0, Number(corporate.driverCommission.value) || 0),
+        }
+      : null,
+    bookedByCorporateAdminId: booker?.adminId || null,
+    bookingNote: String(booker?.note || '').trim().slice(0, 500),
+    requiresApproval: skipApproval ? false : evaluation.requiresApproval,
+    approvalReasons: skipApproval ? [] : evaluation.approvalReasons,
     approvalExpiryMinutes: Math.max(1, Number(corporate.approvalExpiryMinutes || settings.default_approval_expiry_minutes) || 30),
   };
+};
+
+/// Reserves the booking's covered km on the employee's usage row and, if
+/// another booking got there first, re-splits on what was actually held.
+const reserveBookingAllowance = async (booking) => {
+  const allowance = { ...booking.allowance, reservedKm: 0, reservationOpen: false };
+  let { split } = booking;
+  if (!allowance.enabled || !(allowance.estimatedKm > 0)) return { allowance, split };
+
+  try {
+    const usage = await upsertAllowanceUsage({
+      corporateId: booking.corporateId,
+      employeeId: booking.employeeId,
+      roleId: booking.roleId,
+      period: allowance.period,
+      periodKey: allowance.periodKey,
+      allowanceKm: allowance.allowanceKm,
+    });
+    const reserved = allowance.coveredKm > 0 ? await reserveAllowanceKm({ usageId: usage._id, km: allowance.coveredKm }) : 0;
+    allowance.reservedKm = reserved;
+    allowance.reservationOpen = reserved > 0;
+  } catch (error) {
+    console.warn('[corporate-allowance] reservation failed', String(booking.employeeId), error.message);
+  }
+
+  if (allowance.reservedKm !== allowance.coveredKm) {
+    const resplit = computeCorporateSplit({
+      fare: booking.grossFare,
+      km: allowance.estimatedKm,
+      remainingKm: allowance.reservedKm,
+      allowanceEnabled: true,
+    });
+    allowance.coveredKm = resplit.coveredKm;
+    allowance.excessKm = resplit.excessKm;
+    split = {
+      companyAmount: resplit.companyAmount,
+      employeeAmount: resplit.employeeAmount,
+      employeePaymentMethod: split.employeePaymentMethod
+        || (resplit.employeeAmount > 0 ? defaultEmployeePaymentMethod(booking.allowedMethods) : ''),
+    };
+  }
+  return { allowance, split };
 };
 
 /// Stores the corporate context on a freshly created ride and, if the policy
@@ -172,9 +336,15 @@ export const validateCorporateBooking = async ({ userId, serviceType, vehicleTyp
 ///
 /// A company-billed fare is fixed at the quote: bidding and rider fare raises
 /// are switched off so the amount that passed the policy and credit checks is
-/// the amount that gets billed.
+/// the amount that gets billed. A company-tariff fare replaces the Set Price
+/// fare here (`pricingSnapshot.fare_source = 'corporate_tariff'`), and a
+/// company commission override replaces the Set Price commission in the
+/// snapshot wallet settlement reads.
 export const attachCorporateBookingToRide = async ({ ride, booking }) => {
   if (!ride || !booking || ride.paymentMethod !== 'corporate') return ride;
+
+  const { allowance, split } = await reserveBookingAllowance(booking);
+  const discount = computeCorporateDiscount({ discount: booking.discount, serviceType: booking.serviceType, fare: split.companyAmount });
 
   ride.corporate = {
     corporateId: booking.corporateId,
@@ -183,23 +353,56 @@ export const attachCorporateBookingToRide = async ({ ride, booking }) => {
     approvalStatus: booking.requiresApproval ? 'pending' : 'not_required',
     discountType: booking.discount.type,
     discountValue: booking.discount.value,
-    discountAmount: booking.discountAmount,
-    billedAmount: booking.billableAmount,
+    discountAmount: discount.amount,
+    billedAmount: discount.billableAmount,
+    roleId: booking.roleId,
+    bookedByCorporateAdminId: booking.bookedByCorporateAdminId,
+    bookingNote: booking.bookingNote || '',
+    pricing: booking.pricing,
+    driverCommission: booking.driverCommission || undefined,
+    allowance,
+    split: {
+      companyAmount: split.companyAmount,
+      employeeAmount: split.employeeAmount,
+      employeePaymentMethod: split.employeePaymentMethod || '',
+      employeePaymentStatus: split.employeeAmount > 0 ? 'pending' : 'not_required',
+      stage: 'estimate',
+    },
   };
   ride.fare = booking.grossFare;
+  ride.baseFare = booking.grossFare;
+  ride.bidFloorFare = booking.grossFare;
   ride.bookingMode = 'normal';
   ride.pricingNegotiationMode = 'none';
   ride.biddingStatus = 'none';
   ride.nextFareIncreaseAt = null;
   ride.userMaxBidFare = ride.fare;
   ride.bidCeilingMaxFare = ride.fare;
-  await ride.save();
+  if (booking.pricing === 'company_tariff') {
+    ride.pricingSnapshot.fare_source = 'corporate_tariff';
+    ride.pricingSnapshot.fare_breakdown = booking.fareBreakdown;
+    // The rate card is the whole negotiated price; no rider platform fee on top.
+    ride.pricingSnapshot.rider_platform_fee = 0;
+  }
+  if (booking.driverCommission) {
+    // 1 = percentage, anything else = fixed (walletService normalizeCommissionType).
+    ride.pricingSnapshot.admin_commission_type_from_driver = booking.driverCommission.type === 'percentage' ? 1 : 2;
+    ride.pricingSnapshot.admin_commission_from_driver = booking.driverCommission.value;
+  }
+  try {
+    await ride.save();
+  } catch (error) {
+    if (allowance.reservationOpen) {
+      await releaseReservationForUnsavedRide(booking, allowance).catch(() => null);
+    }
+    throw error;
+  }
 
   if (booking.requiresApproval) {
     // Imported lazily: the approval service reaches dispatchService, which
     // imports rideService, which imports this file.
     const { openTripRequestForRide } = await import('./corporateApprovalService.js');
-    await openTripRequestForRide({ ride, booking });
+    await openTripRequestForRide({ ride, booking: { ...booking, billableAmount: discount.billableAmount } });
   }
 
   return ride;
@@ -227,11 +430,16 @@ export const getRiderCorporateProfile = async ({ userId }) => {
     const corporate = corporateById.get(String(employee.corporateId));
     if (!corporate) continue;
     const department = employee.departmentId ? departmentById.get(String(employee.departmentId)) : null;
-    const [policy, spentThisMonth, pendingExposure] = await Promise.all([
-      loadPolicy({ corporateId: corporate._id, departmentId: employee.departmentId }),
+    const role = await resolveEmployeeRole(employee);
+    const monthlyLimit = resolveEmployeeMonthlyLimit({ employee, role });
+    const [policy, spentThisMonth, pendingExposure, allowance] = await Promise.all([
+      loadPolicy({ corporateId: corporate._id, departmentId: employee.departmentId, role, employee }),
       sumCorporateSpend({ 'corporate.employeeId': toObjectId(employee._id) }),
       sumPendingExposure(corporate._id),
+      getAllowanceSnapshot({ employee, role, settings }),
     ]);
+    const zoneOn = isFlagOn(settings.travel_zone_enabled) && corporate.travelZone?.mode === 'office_boundary';
+    const tariffOn = isFlagOn(settings.tariff_enabled) && Boolean(corporate.tariff?.enabled);
     const credit = checkCreditLimit({
       creditLimit: corporate.creditLimit,
       currentOutstanding: corporate.currentOutstanding,
@@ -258,9 +466,28 @@ export const getRiderCorporateProfile = async ({ userId }) => {
         value: corporate.discount?.value || 0,
         appliesTo: corporate.discount?.appliesTo || [],
       },
-      monthlyLimit: employee.monthlyLimit || 0,
+      monthlyLimit,
       spentThisMonth,
-      remainingThisMonth: employee.monthlyLimit ? Math.max(0, round2(employee.monthlyLimit - spentThisMonth)) : null,
+      remainingThisMonth: monthlyLimit ? Math.max(0, round2(monthlyLimit - spentThisMonth)) : null,
+      // --- v2 (contract §3.3)
+      role: serializeRoleRef(role),
+      allowance: {
+        enabled: allowance.enabled,
+        period: allowance.period,
+        periodKey: allowance.periodKey,
+        allowanceKm: allowance.allowanceKm,
+        usedKm: allowance.usedKm,
+        reservedKm: allowance.reservedKm,
+        remainingKm: allowance.remainingKm,
+      },
+      travelZone: {
+        mode: zoneOn ? 'office_boundary' : 'free_roaming',
+        rule: zoneOn ? (corporate.travelZone.rule === 'either_end' ? 'either_end' : 'both_ends') : null,
+        offices: zoneOn ? serializeOffices(corporate.travelZone.offices).map(({ name, lat, lng, radiusKm }) => ({ name, lat, lng, radiusKm })) : [],
+      },
+      excessPayment: { allowedMethods: normalizeExcessMethods(corporate.excessPayment?.allowedMethods) },
+      pricing: tariffOn ? 'company_tariff' : 'standard',
+      tariffAppliesTo: tariffOn ? (corporate.tariff.appliesTo?.length ? corporate.tariff.appliesTo : ['ride', 'intercity']) : [],
       policy: {
         allowedServices,
         allowedVehicleTypeIds: [...(policy.allowedVehicleTypeIds || []), ...(corporate.allowedVehicleTypeIds || [])].map(String),

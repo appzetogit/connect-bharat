@@ -213,8 +213,9 @@ be inside some office circle; `either_end`: at least one. Checked at booking
 | GET | `/roles` | anyRole | → `{ results: [Role + { employeeCount }] }` |
 | POST | `/roles` | managers | Role fields → Role |
 | PATCH | `/roles/:roleId` | managers | partial Role → Role |
-| DELETE | `/roles/:roleId` | managers | refused (409) if employees use it or it is the default |
+| DELETE | `/roles/:roleId` | managers | refused (409) if active employees use it or it is the default; `?reassignToRoleId=` moves them first (§3.5) |
 | POST | `/roles/:roleId/make-default` | managers | → Role |
+| POST | `/roles/:roleId/assign` | managers | `{ employeeIds }` → bulk move (§3.5) |
 | GET | `/employees` | anyRole | existing, plus each row gains `role {id,name,code}`, `employeeCode`, `allowance {periodKey, allowanceKm, usedKm, reservedKm, remainingKm}`; new filter `roleId` |
 | POST/PATCH | `/employees[/:id]` | managers | existing, plus `roleId`; `employeeCode` optional (generated when blank) |
 | GET | `/employees/:id/allowance?periods=6` | anyRole | → `{ current, history: [usage...] }` |
@@ -265,6 +266,26 @@ job picks per company by `billingCycle`.
 
 ---
 
+### 3.5 Dynamic roles (clarification)
+
+Roles are fully dynamic. CEO / VP / Employee are only the seeded starting
+set: a company (or the platform admin) can create any number of roles with any
+name and code, rename the seeded ones, and delete any role, seeded ones
+included. No code branches on a role's name or code; allowance, travel rules
+and approval come only from the role's configured fields.
+
+| Method | Path | Gate | Body / query → response |
+|---|---|---|---|
+| DELETE | `/roles/:roleId[?reassignToRoleId=<id>]` | managers | 409 if it is the current default, or if an **active** employee still has it. With `reassignToRoleId` (query or body) every employee on the role is moved there first, then the role is deleted → `{ deleted: true, reassigned }`. Inactive employees left on a deleted role fall back to the default role. |
+| POST | `/roles/:roleId/assign` | managers | `{ employeeIds: [...] }` (max 5000) → `{ role {id,name,code}, matched, updated, notFound: [ids] }`. Moves those employees of this company onto the role (not to an inactive role). |
+
+The same two under `/admin/corporates/:id/roles/:roleId` (and `/assign`).
+
+Employee import accepts a `Role Code` / `roleCode` column (a role name is also
+accepted, case-insensitive). A row naming a role the company does not have
+fails with `role "<x>" does not exist for this company`; nothing about that row
+is saved. A blank Employee Code means "generate".
+
 ## 4. Settings (corporate section, defaults)
 
 | Key | Default | Meaning |
@@ -278,3 +299,101 @@ Every per-company field defaults off (`allowance.enabled: false`,
 `tariff.enabled: false`, `driverCommission.enabled: false`,
 `travelZone.mode: 'free_roaming'`), so nothing changes for an existing
 company until someone sets it.
+
+---
+
+## 5. Web UI assumptions (shapes the panels read; backend please match)
+
+Added by the web-UI change. No new endpoints beyond the dynamic-roles ones;
+these pin down response shapes §3 left open.
+
+- **Role delete / bulk assign** (dynamic-roles clarification):
+  `DELETE /roles/:roleId?reassignToRoleId=<id>` and
+  `POST /roles/:roleId/assign { employeeIds: [...] }`, and the same under
+  `/admin/corporates/:id/roles/...`. The UI shows a "move employees to…" picker
+  when `employeeCount > 0` or on a 409; the default role's Delete is disabled
+  (make another role default first). Role names/codes are never hardcoded in
+  the UI; every dropdown comes from `GET /roles`.
+- **`GET /bookings`** → `{ items, total, page, limit }` (same paging as
+  `/trips`), each item:
+  `{ rideId, status, serviceType, employee: { id, name, employeeCode }, pickupAddress, dropAddress, vehicleName, scheduledAt, createdAt, fare, split: { companyAmount, employeeAmount, employeePaymentMethod, employeePaymentStatus }, allowance, bookedBy: { id, name } }`.
+  Query: `page, limit, status, employeeId, from, to` (ISO).
+- **`POST /bookings/:rideId/cancel`** body `{ reason? }`.
+- **`POST /bookings/quote`**: each quote's `allowance` is
+  `{ periodKey, allowanceKm, remainingKmAtBooking, estimatedKm, coveredKm, excessKm }`,
+  `split` is `{ companyAmount, employeeAmount }`, `withinBoundary` a boolean
+  (an out-of-boundary quote may come back with `false` or as the 403; both are
+  handled). The 403 body carries `code: 'corporate_outside_boundary'` and
+  `offices: [{ name, address, radiusKm }]` at the top level.
+- **`GET /employees/:id/allowance`**: `current` and `history[]` are
+  `CorporateAllowanceUsage` rows plus `remainingKm` (UI computes it if absent).
+- **`GET /admin/corporates/:id/allowance?periodKey=`** →
+  `{ periodKey, results: [{ employeeId, name, employeeCode, role: { id, name, code }, period, allowanceKm, usedKm, reservedKm, remainingKm, rides }] }`.
+  `periodKey` is `YYYY-MM` or ISO week `YYYY-Www` (what `<input type="week">` yields).
+- **`GET /admin/corporates/:id/employees`** rows gain the same `role` and
+  `allowance` as the panel list, and accept the `roleId` filter.
+- **Invoice detail** (`GET /corporate/invoices/:id`, `GET /admin/corporates/invoices/:invoiceId`):
+  `byRole` and `byEmployee` sit at the top level of the invoice (next to
+  `lines`); byRole rows `{ roleId, roleName, trips, km, coveredKm, excessKm, billedAmount }`
+  (byEmployee: `employeeId, employeeName, employeeCode` instead of the role
+  keys). The UI also reads `summary.byRole` as a fallback.
+- **Exports**: `GET .../invoices/:id/export.csv` / `.xlsx` as a file download.
+- **Vehicle types**: the panel's role picker uses the existing public
+  `GET /users/vehicle-types` (`{ results: [{ _id, name }] }`); admin uses
+  `GET /admin/types/vehicle-types/list`. No new endpoint.
+- **Excess payment methods in the panel** are read from `GET /corporate/me` →
+  `corporate.excessPayment.allowedMethods` (that route already returns the
+  full corporate document).
+- **Employee import** accepts a `roleCode` column (role name also accepted);
+  a blank Employee Code means auto-generate.
+
+---
+
+## 6. Backend implementation notes (where the backend filled gaps)
+
+Recorded by the backend change so both sides read the same thing.
+
+- **Error bodies.** The two corporate refusals carry their fields at the top
+  level of the error JSON as well as under `details`:
+  `403 { success:false, message, code:'corporate_outside_boundary', rule, offices:[{id,name,address,lat,lng,radiusKm}], details:{...same} }`
+  and `400 { ..., code:'corporate_employee_payment_method', allowedMethods, employeeAmount, companyAmount }`
+  (booking with an estimated excess and no / a disallowed `employeePaymentMethod`).
+- **Extra Ride.corporate fields** beyond §1.4: `allowance.enabled`,
+  `allowance.period`, `allowance.reservedKm`, `allowance.reservationOpen`,
+  `allowance.settledAt`, `split.stage` (`'estimate'` | `'final'`),
+  `bookingNote`, `driverCommission {type,value}` (audit copy).
+- **Reservation release.** Every cancel path releases the ride's km
+  reservation once (claimed by flipping `allowance.reservationOpen`): rider
+  cancel, driver cancel of a scheduled ride, admin cancel, unmatched close,
+  approval rejected / expired, the stale-ride cancel in createRideRecord, and
+  travel-desk cancel. A sweep in the corporate job loop (every minute) releases
+  any cancelled ride still holding km, which covers any other path.
+- **Allowance period of a ride** is the period of its pickup time (scheduled
+  time, else booking time), at booking and at completion.
+- **Whole rupees.** `employeeAmount = Math.round(fare × excessKm / km)`.
+- **Commission override** is written into the ride's `pricingSnapshot`
+  (`admin_commission_type_from_driver`/`admin_commission_from_driver`) at
+  booking, which is what wallet settlement reads; like Set Price commission it
+  is locked at booking.
+- **Company tariff**: no surge or night charge; a round-trip / multi-day
+  outstation trip is priced on twice the routed distance and time; the rider
+  platform fee is 0 on tariff-priced trips. Estimated km for the allowance is
+  doubled the same way.
+- **Final fare.** A corporate fare stays fixed at the quote (plus the existing
+  waiting / outstation completion adjustments); it is not re-priced on actual km.
+- **Rentals** are settled once when the booking turns `completed`: km from the
+  inspection odometer (`pickupMeterReading` → `returnMeterReading`); no
+  readings = 0 km (no allowance used, company pays all). Fare = `finalCharge`,
+  else `totalCost`. The employee share is recorded on the booking
+  (`corporateSplit`, method `online`, status `pending`) and on the invoice; the
+  rental module's own payment collection is unchanged, so collecting it is the
+  rental desk's job. Rentals are not km-reserved at booking.
+- **Weekly invoices** are drafted Monday-Wednesday IST (catch-up) for the
+  previous ISO week; monthly on days 1-3 as before; both only with
+  `auto_generate_invoices` on. Manual generation keeps taking `from`/`to`.
+- **Invoice lines.** `grossAmount` on a line and `subtotal` on the invoice are
+  the company's share (so gross − discount = net still holds); `grossFare` is
+  the full fare. Invoices gain `employeePaidTotal` (printed on the PDF as a
+  note, not billed).
+- **Socket `requestRide`** also accepts `corporateId` and
+  `employeePaymentMethod`.

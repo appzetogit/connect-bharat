@@ -226,7 +226,7 @@ export const listCorporateTrips = async ({ corporateId, from, to, departmentId =
   const safePage = Math.max(1, Number(page) || 1);
   const [rides, total] = await Promise.all([
     Ride.find(filter)
-      .select('_id serviceType status liveStatus fare pickupAddress dropAddress createdAt completedAt scheduledAt estimatedDistanceMeters corporate vehicleTypeId')
+      .select('_id serviceType status liveStatus fare pickupAddress dropAddress createdAt completedAt scheduledAt estimatedDistanceMeters actualDistanceMeters actualDistanceSource corporate vehicleTypeId')
       .sort({ createdAt: -1 })
       .skip((safePage - 1) * safeLimit)
       .limit(safeLimit)
@@ -257,6 +257,13 @@ export const listCorporateTrips = async ({ corporateId, from, to, departmentId =
       billedAmount: round2(ride.corporate?.billedAmount),
       approvalStatus: ride.corporate?.approvalStatus || 'not_required',
       invoiceId: ride.corporate?.invoiceId ? String(ride.corporate.invoiceId) : null,
+      // Corporate v2
+      actualKm: ride.actualDistanceMeters !== null && ride.actualDistanceMeters !== undefined ? round2(ride.actualDistanceMeters / 1000) : null,
+      actualDistanceSource: ride.actualDistanceSource || null,
+      pricing: ride.corporate?.pricing || 'standard',
+      split: ride.corporate?.split || null,
+      allowance: ride.corporate?.allowance || null,
+      bookedByCorporateAdminId: ride.corporate?.bookedByCorporateAdminId ? String(ride.corporate.bookedByCorporateAdminId) : null,
       employee: ride.corporate?.employeeId
         ? { id: String(ride.corporate.employeeId._id || ride.corporate.employeeId), name: ride.corporate.employeeId.name || '', employeeCode: ride.corporate.employeeId.employeeCode || '' }
         : null,

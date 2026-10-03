@@ -33,6 +33,25 @@ const annexLineSchema = new mongoose.Schema(
     grossAmount: { type: Number, default: 0 },
     discountAmount: { type: Number, default: 0 },
     netAmount: { type: Number, default: 0 },
+    // --- Corporate v2 (§3.4). grossAmount above is the company's share
+    // (companyAmount) so that grossAmount - discountAmount = netAmount still
+    // holds; grossFare is the whole trip fare.
+    roleName: { type: String, default: '' },
+    pickupAddress: { type: String, default: '' },
+    dropAddress: { type: String, default: '' },
+    vehicleName: { type: String, default: '' },
+    startedAt: { type: Date, default: null },
+    completedAt: { type: Date, default: null },
+    actualKm: { type: Number, default: 0 },
+    coveredKm: { type: Number, default: 0 },
+    excessKm: { type: Number, default: 0 },
+    grossFare: { type: Number, default: 0 },
+    employeeAmount: { type: Number, default: 0 },
+    companyAmount: { type: Number, default: 0 },
+    billedAmount: { type: Number, default: 0 },
+    pricing: { type: String, default: 'standard' },
+    roleId: { type: mongoose.Schema.Types.ObjectId, default: null },
+    roleCode: { type: String, default: '' },
   },
   { _id: false },
 );
@@ -60,7 +79,8 @@ const corporateInvoiceSchema = new mongoose.Schema(
     invoiceNumber: { type: String, required: true, trim: true },
     periodFrom: { type: Date, required: true },
     periodTo: { type: Date, required: true },
-    /// "2026-09" for a monthly run, or "<from>_<to>" for an admin-chosen range.
+    /// "2026-09" for a monthly run, "2026-W41" for a weekly one, or
+    /// "<from>_<to>" for an admin-chosen range.
     /// Unique among live invoices so two server instances running the monthly
     /// job cannot both bill the same month.
     periodKey: { type: String, required: true },
@@ -68,6 +88,14 @@ const corporateInvoiceSchema = new mongoose.Schema(
     live: { type: Boolean, default: true },
     lines: { type: [departmentLineSchema], default: [] },
     annex: { type: [annexLineSchema], default: [] },
+    /// §3.4 / §5: byRole rows { roleId, roleName, roleCode, trips, km,
+    /// coveredKm, excessKm, employeeAmount, billedAmount }; byEmployee rows
+    /// have employeeId / employeeName / employeeCode instead.
+    byRole: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    byEmployee: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    /// Total the employees paid themselves for km over their allowance; not
+    /// part of this invoice's amount, printed for information.
+    employeePaidTotal: { type: Number, default: 0 },
     tripCount: { type: Number, default: 0 },
     subtotal: { type: Number, default: 0 },
     discount: { type: Number, default: 0 },

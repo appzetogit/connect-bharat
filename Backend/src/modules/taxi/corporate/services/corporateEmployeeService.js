@@ -5,6 +5,13 @@ import { User } from '../../user/models/User.js';
 import { CorporateDepartment } from '../models/CorporateDepartment.js';
 import { CorporateEmployee } from '../models/CorporateEmployee.js';
 import { sendEmployeeInvite } from './corporateNotifyService.js';
+import { CorporateAllowanceUsage } from '../models/CorporateAllowanceUsage.js';
+import { CorporateRole } from '../models/CorporateRole.js';
+import { saveWithEmployeeCode } from './corporateEmployeeCodeService.js';
+import { assertRoleId, buildRoleLookup, ensureCorporateRoles, getDefaultRole, serializeRoleRef } from './corporateRoleService.js';
+import { listEmployeeAllowanceHistory, resolveRoleAllowance, serializeUsage } from './corporateAllowanceService.js';
+import { getCorporateSettings } from './corporateSettingsService.js';
+import { getAllowancePeriodKey, normalizeEmployeeCode } from './corporateV2Rules.js';
 import {
   CORPORATE_SERVICE_TYPES,
   normalizeEmployeeImportRow,
@@ -45,11 +52,18 @@ const assertDepartment = async (corporateId, departmentId) => {
   return department._id;
 };
 
+const duplicateError = (error) => {
+  if (error?.code !== 11000) return error;
+  const keys = JSON.stringify(error.keyPattern || error.keyValue || {});
+  if (keys.includes('employeeCode')) return new ApiError(409, 'Another employee already uses this employee code');
+  return new ApiError(409, 'Another employee already uses this phone');
+};
+
 const pickEmployeeFields = (body = {}) => {
   const fields = {};
   if (body.name !== undefined) fields.name = String(body.name || '').trim();
   if (body.email !== undefined) fields.email = String(body.email || '').trim().toLowerCase();
-  if (body.employeeCode !== undefined) fields.employeeCode = String(body.employeeCode || '').trim();
+  if (body.employeeCode !== undefined) fields.employeeCode = normalizeEmployeeCode(body.employeeCode);
   if (body.designation !== undefined) fields.designation = String(body.designation || '').trim();
   if (body.monthlyLimit !== undefined) fields.monthlyLimit = Math.max(0, Number(body.monthlyLimit) || 0);
   if (body.requiresApproval !== undefined) fields.requiresApproval = body.requiresApproval === true || body.requiresApproval === 'true';
@@ -63,18 +77,23 @@ export const createCorporateEmployee = async ({ corporate, body = {}, invite = f
   const fields = pickEmployeeFields(body);
   if (!fields.name) throw new ApiError(400, 'name is required');
   const departmentId = await assertDepartment(corporate._id, body.departmentId);
+  await ensureCorporateRoles(corporate._id);
+  const roleId = await assertRoleId(corporate._id, body.roleId);
 
   const existing = await CorporateEmployee.findOne({ corporateId: corporate._id, phone });
   if (existing?.active) throw new ApiError(409, 'An employee with this phone already exists');
 
   const { user } = await findOrCreateRiderForEmployee({ phone, name: fields.name, email: fields.email });
+  // A blank code keeps the one a re-added employee already had, else one is generated.
+  if (existing && !fields.employeeCode) delete fields.employeeCode;
+  const doc = existing || new CorporateEmployee({ corporateId: corporate._id, phone });
+  // Re-adding someone who was deactivated keeps their history on one record.
+  doc.set({ ...fields, departmentId, userId: user._id, active: true, deactivatedAt: null, ...(roleId !== undefined ? { roleId } : {}) });
   let employee;
-  if (existing) {
-    // Re-adding someone who was deactivated keeps their history on one record.
-    existing.set({ ...fields, departmentId, userId: user._id, active: true, deactivatedAt: null });
-    employee = await existing.save();
-  } else {
-    employee = await CorporateEmployee.create({ ...fields, corporateId: corporate._id, departmentId, phone, userId: user._id });
+  try {
+    employee = await saveWithEmployeeCode(doc, corporate);
+  } catch (error) {
+    throw duplicateError(error);
   }
 
   if (invite) {
@@ -88,6 +107,9 @@ export const updateCorporateEmployee = async ({ corporate, employeeId, body = {}
   if (!employee) throw new ApiError(404, 'Employee not found');
   const fields = pickEmployeeFields(body);
   if (body.departmentId !== undefined) fields.departmentId = await assertDepartment(corporate._id, body.departmentId);
+  if (body.roleId !== undefined) fields.roleId = await assertRoleId(corporate._id, body.roleId);
+  // A blank code never wipes an existing one; it is generated if there is none.
+  if (fields.employeeCode === '' && employee.employeeCode) delete fields.employeeCode;
   if (body.active !== undefined) {
     fields.active = body.active === true || body.active === 'true';
     fields.deactivatedAt = fields.active ? null : new Date();
@@ -103,10 +125,9 @@ export const updateCorporateEmployee = async ({ corporate, employeeId, body = {}
   }
   employee.set(fields);
   try {
-    await employee.save();
+    await saveWithEmployeeCode(employee, corporate);
   } catch (error) {
-    if (error?.code === 11000) throw new ApiError(409, 'Another employee already uses this phone');
-    throw error;
+    throw duplicateError(error);
   }
   return employee.toObject();
 };
@@ -114,8 +135,13 @@ export const updateCorporateEmployee = async ({ corporate, employeeId, body = {}
 export const deactivateCorporateEmployee = async ({ corporate, employeeId }) =>
   updateCorporateEmployee({ corporate, employeeId, body: { active: false } });
 
-export const listCorporateEmployees = async ({ corporateId, search = '', departmentId = '', active = '', page = 1, limit = 25 }) => {
+export const listCorporateEmployees = async ({ corporateId, search = '', departmentId = '', roleId = '', active = '', page = 1, limit = 25 }) => {
   const filter = { corporateId };
+  const defaultRole = await getDefaultRole(corporateId);
+  if (roleId && mongoose.Types.ObjectId.isValid(String(roleId))) {
+    // Employees without a role book under the default one, so they match it.
+    filter.roleId = defaultRole && String(defaultRole._id) === String(roleId) ? { $in: [roleId, null] } : roleId;
+  }
   if (departmentId) filter.departmentId = departmentId === 'none' ? null : departmentId;
   if (active === 'true' || active === true) filter.active = true;
   if (active === 'false' || active === false) filter.active = false;
@@ -135,7 +161,59 @@ export const listCorporateEmployees = async ({ corporateId, search = '', departm
       .lean(),
     CorporateEmployee.countDocuments(filter),
   ]);
-  return { items, total, page: safePage, limit: safeLimit };
+  return { items: await decorateEmployees(corporateId, items, defaultRole), total, page: safePage, limit: safeLimit };
+};
+
+/// Adds `role {id,name,code}` and the current-period `allowance` to employee
+/// rows (contract §3.1).
+export const decorateEmployees = async (corporateId, items, defaultRole = null) => {
+  const roles = await CorporateRole.find({ corporateId }).lean();
+  const roleById = new Map(roles.map((role) => [String(role._id), role]));
+  const fallback = defaultRole || roles.find((role) => role.isDefault) || null;
+  const settings = await getCorporateSettings();
+  const now = new Date();
+  const keyed = items.map((item) => {
+    const role = (item.roleId && roleById.get(String(item.roleId?._id || item.roleId))) || fallback;
+    const allowance = resolveRoleAllowance(role, settings);
+    return { item, role, allowance, periodKey: getAllowancePeriodKey(allowance.period, now) };
+  });
+  const usages = keyed.length
+    ? await CorporateAllowanceUsage.find({ $or: keyed.map(({ item, periodKey }) => ({ employeeId: item._id, periodKey })) }).lean()
+    : [];
+  const usageByKey = new Map(usages.map((usage) => [`${usage.employeeId}:${usage.periodKey}`, usage]));
+  return keyed.map(({ item, role, allowance, periodKey }) => {
+    const usage = serializeUsage(usageByKey.get(`${item._id}:${periodKey}`), { ...allowance, periodKey });
+    return {
+      ...item,
+      role: serializeRoleRef(role),
+      allowance: {
+        enabled: usage.enabled,
+        period: usage.period,
+        periodKey: usage.periodKey,
+        allowanceKm: usage.allowanceKm,
+        usedKm: usage.usedKm,
+        reservedKm: usage.reservedKm,
+        remainingKm: usage.remainingKm,
+      },
+    };
+  });
+};
+
+/// GET /employees/:id/allowance: this period and the last `periods`.
+export const getEmployeeAllowance = async ({ corporateId, employeeId, periods = 6 }) => {
+  if (!mongoose.Types.ObjectId.isValid(String(employeeId))) throw new ApiError(400, 'Invalid employee id');
+  const employee = await CorporateEmployee.findOne({ _id: employeeId, corporateId }).lean();
+  if (!employee) throw new ApiError(404, 'Employee not found');
+  const [decorated] = await decorateEmployees(corporateId, [employee]);
+  const history = await listEmployeeAllowanceHistory({ employeeId: employee._id, limit: periods });
+  return {
+    role: decorated.role,
+    current: decorated.allowance,
+    history: history.map((usage) => ({
+      ...usage,
+      ...serializeUsage(usage, { period: usage.period, periodKey: usage.periodKey, allowanceKm: usage.allowanceKm, enabled: true }),
+    })),
+  };
 };
 
 export const inviteCorporateEmployee = async ({ corporate, employeeId }) => {
@@ -192,19 +270,29 @@ export const importCorporateEmployees = async ({ corporate, body = {} }) => {
     if (department.code) departmentByKey.set(department.code.toLowerCase(), department._id);
   }
 
+  const findRole = await buildRoleLookup(corporate._id);
   const results = { created: 0, updated: 0, failed: 0, errors: [] };
   const seenPhones = new Set();
+  const seenCodes = new Set();
 
   for (let index = 0; index < rawRows.length; index += 1) {
     const rowNumber = index + 2;
     const { errors, value } = normalizeEmployeeImportRow(rawRows[index]);
     if (!errors.length && seenPhones.has(value.phone)) errors.push('duplicate phone in this file');
+    const employeeCode = normalizeEmployeeCode(value.employeeCode);
+    if (!errors.length && employeeCode && seenCodes.has(employeeCode)) errors.push('duplicate employee code in this file');
+    let role = null;
+    if (!errors.length && value.roleKey) {
+      role = findRole(value.roleKey);
+      if (!role) errors.push(`role "${value.roleKey}" does not exist for this company (use an existing role code or name)`);
+    }
     if (errors.length) {
       results.failed += 1;
       results.errors.push({ row: rowNumber, phone: value.phone, errors });
       continue;
     }
     seenPhones.add(value.phone);
+    if (employeeCode) seenCodes.add(employeeCode);
 
     let departmentId = null;
     const departmentKey = (value.departmentCode || value.departmentName).toLowerCase();
@@ -228,7 +316,8 @@ export const importCorporateEmployees = async ({ corporate, body = {} }) => {
       const fields = {
         name: value.name,
         email: value.email,
-        employeeCode: value.employeeCode,
+        ...(employeeCode ? { employeeCode } : {}),
+        ...(role ? { roleId: role._id } : {}),
         designation: value.designation,
         monthlyLimit: value.monthlyLimit,
         requiresApproval: value.requiresApproval,
@@ -238,15 +327,16 @@ export const importCorporateEmployees = async ({ corporate, body = {} }) => {
         active: true,
         deactivatedAt: null,
       };
+      const doc = existing || new CorporateEmployee({ corporateId: corporate._id, phone: value.phone });
+      doc.set(fields);
       let employee;
-      if (existing) {
-        existing.set(fields);
-        employee = await existing.save();
-        results.updated += 1;
-      } else {
-        employee = await CorporateEmployee.create({ ...fields, corporateId: corporate._id, phone: value.phone });
-        results.created += 1;
+      try {
+        employee = await saveWithEmployeeCode(doc, corporate);
+      } catch (error) {
+        throw duplicateError(error);
       }
+      if (existing) results.updated += 1;
+      else results.created += 1;
       if (body.sendInvites) {
         await sendEmployeeInvite({ employee, corporate }).catch(() => null);
         await CorporateEmployee.updateOne({ _id: employee._id }, { $set: { invitedAt: new Date() } });
@@ -261,6 +351,6 @@ export const importCorporateEmployees = async ({ corporate, body = {} }) => {
 };
 
 export const EMPLOYEE_IMPORT_TEMPLATE_CSV = [
-  'Name,Phone,Email,Employee Code,Department,Designation,Monthly Limit,Requires Approval,Allowed Services',
-  'Asha Rao,9876543210,asha@example.com,EMP001,Sales,Manager,5000,no,"ride,intercity"',
+  'Name,Phone,Email,Employee Code,Role Code,Department,Designation,Monthly Limit,Requires Approval,Allowed Services',
+  'Asha Rao,9876543210,asha@example.com,,EMP,Sales,Manager,5000,no,"ride,intercity"',
 ].join('\n');

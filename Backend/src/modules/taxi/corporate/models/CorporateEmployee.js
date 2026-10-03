@@ -11,7 +11,11 @@ const corporateEmployeeSchema = new mongoose.Schema(
     corporateId: { type: mongoose.Schema.Types.ObjectId, ref: 'TaxiCorporate', required: true, index: true },
     departmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'TaxiCorporateDepartment', default: null, index: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'TaxiUser', default: null, index: true },
+    /// Unique per company when non-empty. Generated as `<Corporate.code>-0001`
+    /// when not supplied (corporateEmployeeCodeService.js).
     employeeCode: { type: String, default: '', trim: true },
+    /// CorporateRole; null = the company's default role.
+    roleId: { type: mongoose.Schema.Types.ObjectId, ref: 'TaxiCorporateRole', default: null, index: true },
     name: { type: String, required: true, trim: true },
     /// 10-digit Indian mobile, the join key to `User.phone`.
     phone: { type: String, required: true, trim: true },
@@ -32,6 +36,10 @@ const corporateEmployeeSchema = new mongoose.Schema(
 
 corporateEmployeeSchema.index({ corporateId: 1, phone: 1 }, { unique: true });
 corporateEmployeeSchema.index({ userId: 1, active: 1 });
+corporateEmployeeSchema.index(
+  { corporateId: 1, employeeCode: 1 },
+  { unique: true, partialFilterExpression: { employeeCode: { $gt: '' } } },
+);
 
 export const CorporateEmployee =
   mongoose.models.TaxiCorporateEmployee || mongoose.model('TaxiCorporateEmployee', corporateEmployeeSchema);

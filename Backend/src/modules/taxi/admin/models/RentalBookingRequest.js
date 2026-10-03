@@ -916,6 +916,10 @@ rentalBookingRequestSchema.post('save', function rentalInvoicePostSave(doc) {
     import('../../rental/services/rentalInvoiceService.js')
       .then((module) => module.sendRentalInvoiceOnCompletion({ bookingId }))
       .catch((error) => console.error('[rental-invoice] completion hook failed:', error?.message || error));
+    // Corporate rental: km allowance and company / employee split. No-op otherwise.
+    import('../../corporate/services/corporateRentalHook.js')
+      .then((module) => module.onCorporateRentalCompleted({ bookingId }))
+      .catch((error) => console.error('[corporate-rental] completion hook failed:', error?.message || error));
   });
 });
 

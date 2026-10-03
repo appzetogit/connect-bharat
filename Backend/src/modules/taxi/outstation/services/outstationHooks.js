@@ -3,7 +3,7 @@ import { getOrLoadCachedValue } from '../../../../utils/cache.js';
 import { RIDE_LIVE_STATUS } from '../../constants/index.js';
 import { createDefaultBusinessSettings } from '../../admin/data/defaultBusinessSettings.js';
 import { AdminBusinessSetting } from '../../admin/models/AdminBusinessSetting.js';
-import { DriverLocationHistory } from '../../driver/models/DriverLocationHistory.js';
+import { loadRideGpsKm } from '../../services/rideActualDistanceService.js';
 import { quoteFareForPricingRule } from '../../services/fareEngineService.js';
 import { getTransportRideSettings } from '../../services/transportSettingsService.js';
 import {
@@ -12,7 +12,6 @@ import {
   computeOutstationFinalFare,
   countCalendarDays,
   extractOutstationRates,
-  gpsTrailDistanceKm,
   normalizeOutstationTripFields,
   planOutstationTrip,
   resolveActualDistance,
@@ -210,18 +209,9 @@ export const assertOutstationOdometer = async (ride, nextStatus) => {
   }
 };
 
-const loadGpsKm = async (ride) => {
-  if (!ride?.driverId || !ride?.startedAt) return 0;
-  const rows = await DriverLocationHistory.find({
-    driverId: ride.driverId,
-    createdAt: { $gte: ride.startedAt, $lte: ride.completedAt || new Date() },
-  })
-    .sort({ createdAt: 1 })
-    .select('location createdAt')
-    .limit(20000)
-    .lean();
-  return gpsTrailDistanceKm(rows.map((row) => ({ coordinates: row.location?.coordinates, at: row.createdAt })));
-};
+// GPS trail km now lives in services/rideActualDistanceService.js, shared with
+// the actual-km stamp every completed ride gets.
+const loadGpsKm = loadRideGpsKm;
 
 const isDriverCollectionPaid = (ride) => (
   Boolean(ride?.driverPaymentCollection?.paidAt)

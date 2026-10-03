@@ -89,13 +89,16 @@ const POLICY_DEFAULTS = Object.freeze({
   requireApprovalAlways: false,
 });
 
-/// Company policy, then department policy on top. A department value wins only
-/// where it actually says something (non-empty list, non-null scalar), so a
-/// department policy that only sets a fare cap still inherits the company's
-/// hours.
-export const mergePolicies = (companyPolicy = null, departmentPolicy = null) => {
+/// Company policy, then department policy on top, then (v2) the role's travel
+/// rules and the employee's own. Each later layer wins only where it actually
+/// says something (non-empty list, non-null scalar), so a department policy
+/// that only sets a fare cap still inherits the company's hours.
+///
+/// Call as mergePolicies(company, department, role, employee); build the last
+/// two with rolePolicyLayer / employeePolicyLayer.
+export const mergePolicies = (...layers) => {
   const merged = { ...POLICY_DEFAULTS };
-  for (const source of [companyPolicy, departmentPolicy]) {
+  for (const source of layers) {
     if (!source || source.active === false) continue;
     for (const key of Object.keys(POLICY_DEFAULTS)) {
       if (key === 'active') continue;
@@ -108,6 +111,39 @@ export const mergePolicies = (companyPolicy = null, departmentPolicy = null) => 
     }
   }
   return merged;
+};
+
+/// A CorporateRole as a policy layer: only the travel-rule fields, with the
+/// role's own "unset" values (empty list, null) left to inherit. An inactive
+/// role contributes nothing.
+export const rolePolicyLayer = (role = null) => {
+  if (!role || role.active === false) return null;
+  return {
+    allowedServices: Array.isArray(role.allowedServices) ? role.allowedServices : [],
+    allowedVehicleTypeIds: Array.isArray(role.allowedVehicleTypeIds) ? role.allowedVehicleTypeIds : [],
+    maxFarePerTrip: toNumberOrNull(role.maxFarePerTrip),
+    requireApprovalAlways: role.requireApprovalAlways === true || role.requireApprovalAlways === false ? role.requireApprovalAlways : null,
+    requireApprovalAbove: toNumberOrNull(role.requireApprovalAbove),
+  };
+};
+
+/// The employee's own settings as the last policy layer. `requiresApproval`
+/// only ever tightens (false means "not set" here, as it always has).
+export const employeePolicyLayer = (employee = null) => {
+  if (!employee) return null;
+  return {
+    allowedServices: Array.isArray(employee.allowedServices) ? employee.allowedServices : [],
+    requireApprovalAlways: employee.requiresApproval === true ? true : null,
+  };
+};
+
+/// The employee's monthly cap on company-paid spend: their own limit when set,
+/// else the role's `monthlySpendLimit`. 0 = none.
+export const resolveEmployeeMonthlyLimit = ({ employee = {}, role = null } = {}) => {
+  const own = Math.max(0, Number(employee?.monthlyLimit) || 0);
+  if (own > 0) return own;
+  if (!role || role.active === false) return 0;
+  return Math.max(0, Number(role.monthlySpendLimit) || 0);
 };
 
 /// Whether a trip may be billed to the company, and whether it needs an
@@ -256,7 +292,22 @@ export const resolveGstMode = (supplierGstin = '', customerGstin = '') => {
   return supplierState === customerState ? 'intra' : 'inter';
 };
 
+const addUsageSummary = (map, key, identity, item, netAmount) => {
+  if (!map.has(key)) map.set(key, { ...identity, trips: 0, km: 0, coveredKm: 0, excessKm: 0, employeeAmount: 0, billedAmount: 0 });
+  const row = map.get(key);
+  row.trips += 1;
+  row.km = round2(row.km + (Number(item.actualKm) || 0));
+  row.coveredKm = round2(row.coveredKm + (Number(item.coveredKm) || 0));
+  row.excessKm = round2(row.excessKm + (Number(item.excessKm) || 0));
+  row.employeeAmount = round2(row.employeeAmount + (Number(item.employeeAmount) || 0));
+  row.billedAmount = round2(row.billedAmount + netAmount);
+};
+
 /// Department lines, the per-trip annex and the totals for one invoice.
+///
+/// v2: also `byRole` and `byEmployee` (trips, km, covered/excess km, billed)
+/// and `employeePaidTotal`. An item's `grossAmount` is the company's share of
+/// the fare; the employee-paid excess is never part of the invoice amount.
 ///
 /// `inclusive` (the default) treats trip fares as GST-inclusive, which is how
 /// they were quoted to the rider and charged to the credit account, so the
@@ -264,6 +315,8 @@ export const resolveGstMode = (supplierGstin = '', customerGstin = '') => {
 /// on top and the invoice total is higher than the charged amount.
 export const buildInvoiceTotals = ({ items = [], gstPercent = 0, inclusive = true, mode = 'intra' } = {}) => {
   const byDepartment = new Map();
+  const byRole = new Map();
+  const byEmployee = new Map();
   const annex = [];
 
   for (const item of items) {
@@ -290,6 +343,20 @@ export const buildInvoiceTotals = ({ items = [], gstPercent = 0, inclusive = tru
     line.netAmount = round2(line.netAmount + netAmount);
 
     annex.push({ ...item, grossAmount, discountAmount, netAmount });
+    addUsageSummary(
+      byRole,
+      item.roleId ? String(item.roleId) : `name:${item.roleName || ''}`,
+      { roleId: item.roleId ? String(item.roleId) : null, roleName: item.roleName || 'Unassigned', roleCode: item.roleCode || '' },
+      item,
+      netAmount,
+    );
+    addUsageSummary(
+      byEmployee,
+      item.employeeId ? String(item.employeeId) : '__none__',
+      { employeeId: item.employeeId ? String(item.employeeId) : null, employeeName: item.employeeName || '', employeeCode: item.employeeCode || '' },
+      item,
+      netAmount,
+    );
   }
 
   annex.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
@@ -315,9 +382,14 @@ export const buildInvoiceTotals = ({ items = [], gstPercent = 0, inclusive = tru
   const igst = mode === 'inter' ? taxTotal : 0;
   const total = inclusive ? netAmount : round2(netAmount + taxTotal);
 
+  const sortSummary = (map) => [...map.values()].sort((a, b) => b.billedAmount - a.billedAmount || b.trips - a.trips);
+
   return {
     lines,
     annex,
+    byRole: sortSummary(byRole),
+    byEmployee: sortSummary(byEmployee),
+    employeePaidTotal: round2(annex.reduce((sum, item) => sum + (Number(item.employeeAmount) || 0), 0)),
     tripCount: annex.length,
     subtotal,
     discount,
@@ -457,6 +529,8 @@ export const normalizeEmployeeImportRow = (row = {}) => {
       phone,
       email: pick('email', 'email address').toLowerCase(),
       employeeCode: pick('employee code', 'employee id', 'emp code', 'code'),
+      /// Role code or name; matched against the company's roles on import.
+      roleKey: pick('role code', 'role', 'role name'),
       designation: pick('designation', 'title'),
       departmentName: pick('department', 'department name'),
       departmentCode: pick('department code', 'dept code'),
