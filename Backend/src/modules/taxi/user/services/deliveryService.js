@@ -297,6 +297,7 @@ export const createDeliveryRecord = async ({
     transport_type: 'delivery',
     serviceType: 'parcel',
     parcel,
+    serverPricedFareSource: 'delivery_tariff',
   });
 
   // Waiting at the pickup is charged on the same tariff as the fare, and locked

@@ -22,6 +22,9 @@ import { getTipSettings } from './appSettingsService.js';
 import { getBidRideSettings } from './transportSettingsService.js';
 import { resolveBiddingPolicy } from './biddingPolicyService.js';
 import { resolveRideRoute } from './routeService.js';
+import { computePackageFare, quoteFareForPricingRule } from './fareEngineService.js';
+import { getTransportRideSettings } from './transportSettingsService.js';
+import { findZoneByPickup } from './matchingService.js';
 
 const clearUserActiveRideIfPresent = async (user) => {
   if (!user?.currentRideId) {
@@ -420,6 +423,8 @@ const normalizeIntercityPayload = (intercity = {}) => ({
   passengers: Math.max(Number(intercity.passengers || 1), 1),
   distance: Math.max(Number(intercity.distance || 0), 0),
   vehicleName: String(intercity.vehicleName || '').trim(),
+  packageId: String(intercity.packageId || '').trim(),
+  packageTypeName: String(intercity.packageTypeName || '').trim(),
 });
 
 const normalizeScheduledAt = (value) => {
@@ -1030,6 +1035,87 @@ const syncDeliveryWithRide = async (ride) => {
   return delivery;
 };
 
+/// The fare a booking is made at, and where it came from.
+///
+/// The server prices the trip whenever it has a Set Price row to price from;
+/// the app's number is kept on the ride for comparison but no longer decides
+/// what is charged. With no row - a vehicle the admin never priced - the app's
+/// figure is still taken, as it always was, so a gap in the tariff does not
+/// stop bookings; `fare_source: 'client'` marks those rides for the admin.
+const resolveBookingFare = async ({
+  clientFare,
+  serverPricedFareSource,
+  pricingRule,
+  serviceType,
+  distanceMeters,
+  durationMinutes,
+  zone,
+  zoneId,
+  serviceLocationId,
+  at,
+  intercity = null,
+  vehicleTypeId = null,
+}) => {
+  if (serverPricedFareSource) {
+    return { fare: clientFare, fareSource: serverPricedFareSource, fareBreakdown: null };
+  }
+
+  const settings = await getTransportRideSettings();
+  const wantsServerFare = String(settings?.fare_source || 'server').trim().toLowerCase() !== 'client';
+
+  if (wantsServerFare && serviceType === 'intercity') {
+    // A package trip is priced off the package the rider picked, which is what
+    // the apps quote from. The package id is the Set Price row's id.
+    const packageId = String(intercity?.packageId || '').trim();
+    if (packageId && mongoose.Types.ObjectId.isValid(packageId) && vehicleTypeId) {
+      const packageRow = await SetPrice.findOne({
+        _id: packageId,
+        pricing_scope: 'package',
+        active: 1,
+        status: 'active',
+      }).lean();
+      const breakdown = computePackageFare({
+        packageRow,
+        vehicleTypeId,
+        tripType: intercity?.tripType,
+        roundTripMultiplier: settings?.outstation_round_trip_multiplier,
+      });
+      if (breakdown && breakdown.total > 0) {
+        return { fare: breakdown.total, fareSource: 'server', fareBreakdown: breakdown };
+      }
+    }
+
+    // Off-package outstation trips are priced only where the admin set
+    // outstation rates on the vehicle; elsewhere the app's figure stands until
+    // outstation pricing is reworked.
+    const hasOutstationRates = Boolean(pricingRule?.enable_outstation_ride)
+      && (Number(pricingRule?.outstation_price_per_distance) > 0 || Number(pricingRule?.outstation_base_price) > 0);
+    if (!hasOutstationRates) {
+      return { fare: clientFare, fareSource: 'client', fareBreakdown: null };
+    }
+  }
+
+  if (wantsServerFare && pricingRule) {
+    const breakdown = await quoteFareForPricingRule({
+      pricingRule,
+      distanceMeters,
+      durationMinutes,
+      serviceType,
+      zone,
+      zoneId,
+      serviceLocationId,
+      at,
+      settings,
+    });
+
+    if (breakdown && breakdown.total > 0) {
+      return { fare: breakdown.total, fareSource: 'server', fareBreakdown: breakdown };
+    }
+  }
+
+  return { fare: clientFare, fareSource: 'client', fareBreakdown: null };
+};
+
 export const createRideRecord = async ({
   userId,
   pickupCoords,
@@ -1056,6 +1142,9 @@ export const createRideRecord = async ({
   userMaxBidFare,
   bidStepAmount,
   platformFee,
+  // Set only by server code that has already priced the trip itself (the
+  // parcel tariff). A fare arriving from an app never sets this.
+  serverPricedFareSource = null,
 }) => {
   const user = await User.findById(userId);
 
@@ -1067,11 +1156,11 @@ export const createRideRecord = async ({
 
   const riderOtp = await resolveRiderOtp(user);
 
-  const safeFare = Number(fare);
+  const clientFare = Number(fare);
   const safeEstimatedDistanceMeters = Math.max(0, Number(estimatedDistanceMeters || 0));
   const safeEstimatedDurationMinutes = Math.max(0, Number(estimatedDurationMinutes || 0));
 
-  if (!Number.isFinite(safeFare) || safeFare < 0) {
+  if (!Number.isFinite(clientFare) || clientFare < 0) {
     throw new ApiError(400, 'fare must be a positive number or zero');
   }
 
@@ -1099,14 +1188,20 @@ export const createRideRecord = async ({
     '',
   ).trim();
   const normalizedTransportType = normalizeRideTransportType(transport_type);
+  // The pickup decides the zone when the app does not say. The socket booking
+  // path never sent one, so those rides priced off the global row even inside
+  // a zone with its own rates.
+  const pickupZone = zone_id && mongoose.Types.ObjectId.isValid(zone_id)
+    ? null
+    : await findZoneByPickup(pickupCoords, { serviceLocationId: service_location_id }).catch(() => null);
   const resolvedZoneId =
     zone_id && mongoose.Types.ObjectId.isValid(zone_id)
       ? new mongoose.Types.ObjectId(zone_id)
-      : null;
+      : (pickupZone?._id || null);
   const resolvedServiceLocationId =
     service_location_id && mongoose.Types.ObjectId.isValid(service_location_id)
       ? new mongoose.Types.ObjectId(service_location_id)
-      : null;
+      : (pickupZone?.service_location_id || null);
   const { pricingRule, allowedPaymentMethods } = await getAllowedRidePaymentMethodsForPricing({
     zoneId: resolvedZoneId,
     serviceLocationId: resolvedServiceLocationId,
@@ -1119,6 +1214,47 @@ export const createRideRecord = async ({
     : (allowedPaymentMethods[0] || 'cash');
   const requestedBookingMode = String(bookingMode || '').trim().toLowerCase();
   const normalizedServiceType = normalizeServiceType(serviceType);
+  const normalizedScheduledAt = normalizeScheduledAt(scheduledAt);
+
+  // Never fatal: `resolveRideRoute` swallows its own failures and returns null,
+  // so a routing outage costs a polyline rather than the booking.
+  const resolvedRoute = await resolveRideRoute({ pickupCoords, dropCoords });
+
+  // Deliveries send neither figure, and a rider's estimate is only ever a
+  // guess, so the routed values win where we have them.
+  const routedDistanceMeters = resolvedRoute?.distanceMeters > 0
+    ? resolvedRoute.distanceMeters
+    : safeEstimatedDistanceMeters;
+  const routedDurationMinutes = resolvedRoute?.durationMinutes > 0
+    ? resolvedRoute.durationMinutes
+    : safeEstimatedDurationMinutes;
+  const routeDocument = resolvedRoute
+    ? {
+        polyline: resolvedRoute.polyline,
+        distanceMeters: resolvedRoute.distanceMeters,
+        durationMinutes: resolvedRoute.durationMinutes,
+        provider: resolvedRoute.provider,
+        fetchedAt: resolvedRoute.fetchedAt,
+      }
+    : undefined;
+
+  const { fare: safeFare, fareSource, fareBreakdown } = await resolveBookingFare({
+    clientFare,
+    serverPricedFareSource,
+    pricingRule,
+    serviceType: normalizedServiceType,
+    distanceMeters: routedDistanceMeters,
+    durationMinutes: routedDurationMinutes,
+    zone: pickupZone,
+    zoneId: resolvedZoneId,
+    serviceLocationId: resolvedServiceLocationId,
+    // A scheduled ride is priced for when it runs, so night and surge windows
+    // follow the pickup time rather than the booking time.
+    at: normalizedScheduledAt || new Date(),
+    intercity,
+    vehicleTypeId: primaryVehicleTypeId,
+  });
+
   const bidRideSettings = await getBidRideSettings();
   const fareIncreaseWaitMinutes = toPositiveNumber(
     bidRideSettings.user_fare_increase_wait_minutes,
@@ -1133,7 +1269,7 @@ export const createRideRecord = async ({
   const biddingPolicy = await resolveBiddingPolicy({
     vehicle: primaryVehicle,
     serviceType: normalizedServiceType,
-    distanceMeters: safeEstimatedDistanceMeters,
+    distanceMeters: routedDistanceMeters,
     bidSettings: bidRideSettings,
   });
   // Rapido's behaviour, and what the client asked for: a rider who is waiting
@@ -1237,11 +1373,13 @@ export const createRideRecord = async ({
     free_waiting_after: Number(pricingRule?.free_waiting_after ?? 0),
     allowed_payment_methods: allowedPaymentMethods,
     rider_platform_fee: riderPlatformFee,
+    fare_source: fareSource,
+    fare_breakdown: fareBreakdown,
+    client_quoted_fare: Number.isFinite(clientFare) ? clientFare : null,
     resolvedAt: pricingRule ? new Date() : null,
   };
 
   const promoCode = typeof promo_code === 'string' ? promo_code.trim() : '';
-  const normalizedScheduledAt = normalizeScheduledAt(scheduledAt);
   const applicableSubscription = primaryVehicleTypeId
     ? await resolveApplicableUserSubscription({
         userId,
@@ -1295,28 +1433,6 @@ export const createRideRecord = async ({
   if (isSubscriptionCovered && promoCode) {
     throw new ApiError(400, 'Promo codes cannot be combined with subscription rides');
   }
-
-  // Never fatal: `resolveRideRoute` swallows its own failures and returns null,
-  // so a routing outage costs a polyline rather than the booking.
-  const resolvedRoute = await resolveRideRoute({ pickupCoords, dropCoords });
-
-  // Deliveries send neither figure, and a rider's estimate is only ever a
-  // guess, so the routed values win where we have them.
-  const routedDistanceMeters = resolvedRoute?.distanceMeters > 0
-    ? resolvedRoute.distanceMeters
-    : safeEstimatedDistanceMeters;
-  const routedDurationMinutes = resolvedRoute?.durationMinutes > 0
-    ? resolvedRoute.durationMinutes
-    : safeEstimatedDurationMinutes;
-  const routeDocument = resolvedRoute
-    ? {
-        polyline: resolvedRoute.polyline,
-        distanceMeters: resolvedRoute.distanceMeters,
-        durationMinutes: resolvedRoute.durationMinutes,
-        provider: resolvedRoute.provider,
-        fetchedAt: resolvedRoute.fetchedAt,
-      }
-    : undefined;
 
   if (!promoCode) {
     const ride = await Ride.create({

@@ -137,6 +137,18 @@ const rideSchema = new mongoose.Schema(
         default: '',
         trim: true,
       },
+      // The intercity package (a pricing_scope 'package' Set Price row) the
+      // rider picked, when the trip was booked off the package catalogue.
+      packageId: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      packageTypeName: {
+        type: String,
+        default: '',
+        trim: true,
+      },
     },
     parcel: {
       category: {
@@ -548,6 +560,24 @@ const rideSchema = new mongoose.Schema(
       allowed_payment_methods: {
         type: [String],
         default: ['cash', 'online'],
+      },
+      // Where the fare came from: 'server' (fareEngineService), 'delivery_tariff'
+      // (parcels), or 'client' - the app's own figure, only when the server had
+      // no Set Price row to work from or fare_source is set to 'client'.
+      fare_source: {
+        type: String,
+        default: '',
+      },
+      // The itemised quote the fare was booked at: base, distance, time, surge,
+      // night, minimum-fare top-up and tax. Kept so the invoice and any later
+      // fare adjustment start from what the rider was actually quoted.
+      fare_breakdown: {
+        type: mongoose.Schema.Types.Mixed,
+        default: null,
+      },
+      client_quoted_fare: {
+        type: Number,
+        default: null,
       },
       // Where a parcel's delivery tariff came from: 'zone', 'service_location'
       // or 'vehicle'. Its presence also tells the waiting charge that

@@ -176,6 +176,36 @@ const setPriceSchema = new mongoose.Schema(
       type: Number,
       default: null,
     },
+    // A floor under the pre-tax fare, so a 600m hop still pays something worth
+    // the driver's time. 0 means no floor.
+    minimum_fare: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    // Night charge: 'percentage' of the trip fare, or a 'fixed' sum, added when
+    // the pickup falls inside night_start_time-night_end_time on the city's
+    // clock. The window may wrap past midnight. 0 means no night charge.
+    night_charge_type: {
+      type: String,
+      enum: ['percentage', 'fixed'],
+      default: 'percentage',
+    },
+    night_charge: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    night_start_time: {
+      type: String,
+      default: '22:00',
+      trim: true,
+    },
+    night_end_time: {
+      type: String,
+      default: '06:00',
+      trim: true,
+    },
     outstation_base_price: {
       type: Number,
       default: 0,

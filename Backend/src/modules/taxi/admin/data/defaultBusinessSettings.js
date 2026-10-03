@@ -90,6 +90,17 @@ export const createDefaultBusinessSettings = () => ({
     max_dist_secondary_ride: '2',
     enable_my_route_booking_feature: '0',
     how_many_times_a_driver_can_enable_the_my_route_booking_per_day: '1',
+    // Charge the Price Hike windows and zone peak surge on real fares. Off by
+    // default: the hike windows were display-only for a long time, and some
+    // are still configured live.
+    enable_surge_pricing: '0',
+    // Whose number a taxi or outstation fare books at. 'server' prices the trip
+    // from the Set Price row and ignores the app's figure; 'client' is the old
+    // behaviour, kept as an escape hatch while the apps move to /rides/estimate.
+    fare_source: 'server',
+    // A round-trip intercity package costs this many one-way fares. 1.8 is what
+    // the apps have always quoted.
+    outstation_round_trip_multiplier: '1.8',
   },
   bid_ride: {
     // The master switch, and which services may be bid on at all. Both are

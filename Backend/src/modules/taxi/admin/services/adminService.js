@@ -2095,6 +2095,11 @@ const serializeSetPrice = (item) => ({
   outstation_time_price: item.outstation_time_price ?? 0,
   free_waiting_before: item.free_waiting_before,
   free_waiting_after: item.free_waiting_after,
+  minimum_fare: item.minimum_fare ?? 0,
+  night_charge_type: item.night_charge_type || 'percentage',
+  night_charge: item.night_charge ?? 0,
+  night_start_time: item.night_start_time || '22:00',
+  night_end_time: item.night_end_time || '06:00',
 
   // Settings
   enable_airport_ride: Boolean(item.enable_airport_ride),
@@ -7265,6 +7270,11 @@ export const listSetPrices = async (queryArgs = {}, currentAdmin = null) => {
       outstation_base_distance: Number(item.outstation_base_distance ?? 0),
       outstation_price_per_distance: Number(item.outstation_price_per_distance ?? 0),
       outstation_time_price: Number(item.outstation_time_price ?? 0),
+      minimum_fare: Number(item.minimum_fare ?? 0),
+      night_charge_type: item.night_charge_type || 'percentage',
+      night_charge: Number(item.night_charge ?? 0),
+      night_start_time: item.night_start_time || '22:00',
+      night_end_time: item.night_end_time || '06:00',
       updatedAt: item.updatedAt,
     };
   });
@@ -7513,6 +7523,19 @@ const resolveSetPriceVehicleAndTransportType = async ({
   };
 };
 
+
+/// "HH:MM" on a 24-hour clock, or the fallback. The fare engine reads these as
+/// wall-clock times on the city's clock; anything it cannot parse would quietly
+/// switch the night charge off, so bad input is replaced rather than stored.
+const normalizeClockTime = (value, fallback) => {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(String(value ?? '').trim());
+  if (!match) return fallback;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) return fallback;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+};
+
 export const createSetPrice = async (payload, currentAdmin = null) => {
   if (currentAdmin) {
     assertAdminPermission(currentAdmin, 'set_prices.view', 'set prices');
@@ -7591,6 +7614,11 @@ export const createSetPrice = async (payload, currentAdmin = null) => {
     outstation_time_price: Number(payload.outstation_time_price ?? 0),
     free_waiting_before: Number(payload.free_waiting_before ?? 0),
     free_waiting_after: Number(payload.free_waiting_after ?? 0),
+    minimum_fare: Math.max(0, Number(payload.minimum_fare ?? 0) || 0),
+    night_charge_type: payload.night_charge_type === 'fixed' ? 'fixed' : 'percentage',
+    night_charge: Math.max(0, Number(payload.night_charge ?? 0) || 0),
+    night_start_time: normalizeClockTime(payload.night_start_time, '22:00'),
+    night_end_time: normalizeClockTime(payload.night_end_time, '06:00'),
 
     enable_shared_ride: Number(payload.enable_shared_ride ?? (payload.enable_ride_sharing ? 1 : 0)),
     enable_ride_sharing: payload.enable_ride_sharing ?? !!payload.enable_shared_ride,
@@ -7637,6 +7665,7 @@ export const updateSetPrice = async (id, payload, currentAdmin = null) => {
     'waiting_charge', 'outstation_base_price', 'outstation_base_distance',
     'outstation_price_per_distance', 'outstation_time_price',
     'free_waiting_before', 'free_waiting_after',
+    'minimum_fare', 'night_charge_type', 'night_charge', 'night_start_time', 'night_end_time',
     'enable_shared_ride', 'enable_ride_sharing', 'price_per_seat',
     'shared_price_per_distance', 'shared_cancel_fee',
     'user_cancellation_fee', 'driver_cancellation_fee', 'cancellation_fee_goes_to',
@@ -7663,6 +7692,8 @@ export const updateSetPrice = async (id, payload, currentAdmin = null) => {
     'outstation_time_price',
     'free_waiting_before',
     'free_waiting_after',
+    'minimum_fare',
+    'night_charge',
     'price_per_seat',
     'shared_price_per_distance',
     'shared_cancel_fee',
@@ -7725,6 +7756,13 @@ export const updateSetPrice = async (id, payload, currentAdmin = null) => {
       if (field === 'driver_cancellation_fee') value = payload.cancellation_fee_for_driver;
       if (field === 'cancellation_fee_goes_to') value = payload.fee_goes_to;
       if (field === 'enable_ride_sharing') value = payload.enable_shared_ride !== undefined ? !!payload.enable_shared_ride : undefined;
+    }
+
+    if (value !== undefined && (field === 'night_start_time' || field === 'night_end_time')) {
+      value = normalizeClockTime(value, setPrice[field] || (field === 'night_start_time' ? '22:00' : '06:00'));
+    }
+    if (value !== undefined && field === 'night_charge_type') {
+      value = value === 'fixed' ? 'fixed' : 'percentage';
     }
 
     if (value !== undefined) {
