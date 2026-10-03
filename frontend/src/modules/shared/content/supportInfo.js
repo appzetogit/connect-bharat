@@ -15,7 +15,7 @@ import useLandingContent from '../../landing/useLandingContent';
  */
 
 const STATIC_DETAILS = {
-  companyName: 'ZI CAB Technologies Pvt Ltd',
+  companyName: 'Connect Bharat',
   supportLabel: '24x7 customer support',
   responseTime: 'Replies typically within 2 hours',
   serviceArea: 'Taxi rides, parcels, bookings, payments, and account help',

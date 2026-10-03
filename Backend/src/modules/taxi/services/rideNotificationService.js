@@ -33,7 +33,7 @@ const RIDER_MESSAGES = {
   }),
   completed: (ride) => ({
     title: 'Trip completed',
-    body: `Fare ${rupees(ride.fare)}. Thanks for riding with ZI CAB.`,
+    body: `Fare ${rupees(ride.fare)}. Thanks for riding with Connect Bharat.`,
   }),
 };
 

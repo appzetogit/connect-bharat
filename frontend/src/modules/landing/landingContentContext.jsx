@@ -15,11 +15,11 @@ import { useSettings } from '../../shared/context/SettingsContext';
 
 const LandingContentContext = createContext(null);
 
-const DEFAULT_WA_MESSAGE = "Hi ZI CAB, I'd like to book a ride.";
+const DEFAULT_WA_MESSAGE = "Hi Connect Bharat, I'd like to book a ride.";
 
 /// The file the CMS brand block shipped with. An untouched field still holds
 /// it, so it counts as "not set" rather than as a deliberate choice.
-const BUNDLED_LOGO = '/zicab-logo.jpg';
+const BUNDLED_LOGO = '/connect-bharat-logo.jpg';
 
 /// The logo the site shows: one set in Website Content if anyone has set one
 /// there, otherwise the logo from General Settings, otherwise the bundled file.

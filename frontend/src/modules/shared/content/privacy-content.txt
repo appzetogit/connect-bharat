@@ -1,22 +1,22 @@
 PRIVACY POLICY
 Last updated: 22 September 2026
 
-This Privacy Policy explains how ZI CAB Technologies Pvt Ltd ("ZI CAB", "we", "us" or "our") collects, uses, shares, stores and protects your information when you use the ZI CAB rider app, the ZI CAB driver app, and our website at https://zicab.in (together, the "ZI CAB Platform").
+This Privacy Policy explains how Connect Bharat ("Connect Bharat", "we", "us" or "our") collects, uses, shares, stores and protects your information when you use the Connect Bharat rider app, the Connect Bharat driver app, and our website at https://bharat.buytogetherindia.com (together, the "Connect Bharat Platform").
 
-It applies to riders who book rides or parcel deliveries, drivers and vehicle owners who offer services on the ZI CAB Platform, and visitors to our website. By using the ZI CAB Platform you agree to this Policy. If you do not agree, please do not use the ZI CAB Platform.
+It applies to riders who book rides or parcel deliveries, drivers and vehicle owners who offer services on the Connect Bharat Platform, and visitors to our website. By using the Connect Bharat Platform you agree to this Policy. If you do not agree, please do not use the Connect Bharat Platform.
 
 A. Who We Are
-ZI CAB Technologies Pvt Ltd
+Connect Bharat
 Founder & CEO: Shamsher Mohammed
 Office No 13, Grand Majestic Mall, Gandhinagar, Bengaluru - 560009, Karnataka, India
 Phone / WhatsApp: +91 8904343123
-Email: zicabofficial@gmail.com
+Email: support@bharat.buytogetherindia.com
 
 B. Information We Collect From Riders
 Account details: your name, mobile number, email address (if provided), profile photo (if provided), gender (if provided) and emergency contacts you choose to add.
 Trip details: pickup and drop locations, stops, route, trip time, distance, fare, vehicle type chosen, ride OTP, ratings, feedback and trip history.
 Parcel details: sender and receiver names, phone numbers, addresses and a description of the item being delivered.
-Payment details: payment method, transaction reference, amount and wallet balance. Card and UPI details are handled directly by our licensed payment partners; ZI CAB does not store your full card number or UPI PIN.
+Payment details: payment method, transaction reference, amount and wallet balance. Card and UPI details are handled directly by our licensed payment partners; Connect Bharat does not store your full card number or UPI PIN.
 Support details: messages, calls, tickets and any files you share with our support team.
 
 C. Information We Collect From Drivers and Vehicle Owners
@@ -29,7 +29,7 @@ Performance details: online and offline status, trips accepted, cancelled and co
 D. Location Information
 Riders: we use your device location to set your pickup point, show nearby drivers, calculate fares and share your live trip with you. Location is used while you are booking and during an active trip.
 Drivers: we collect your location while you are online, including when the driver app is running in the background, so that we can offer you nearby ride requests, show your live position to the rider during a trip, calculate distance and fares, and support rider and driver safety. Location collection stops when you go offline.
-You can turn off location permission in your phone settings at any time, but the ZI CAB Platform cannot book or offer rides without it.
+You can turn off location permission in your phone settings at any time, but the Connect Bharat Platform cannot book or offer rides without it.
 
 E. Device and Usage Information
 We collect basic technical information such as device model, operating system, app version, IP address, crash logs and push notification tokens. We use this to keep the apps working, fix errors, prevent fraud and send you trip updates.
@@ -41,7 +41,7 @@ To calculate fares, process payments, refunds, wallet transactions and driver pa
 To share trip status, driver details and live location with the rider, and pickup details with the driver.
 To verify drivers and vehicles before they are allowed to take trips.
 To provide customer support and resolve complaints, disputes and lost-item requests.
-To keep the ZI CAB Platform safe, including investigating incidents and preventing fraud or misuse.
+To keep the Connect Bharat Platform safe, including investigating incidents and preventing fraud or misuse.
 To send service messages such as OTPs, booking confirmations, receipts and important updates.
 To improve our services, pricing and app performance.
 To meet our obligations under applicable law and respond to lawful requests from authorities.
@@ -50,35 +50,35 @@ G. How We Share Your Information
 Between riders and drivers: during a trip, the rider sees the driver's name, photo, vehicle details, rating and live location, and the driver sees the rider's name, pickup and drop points. Phone numbers are shared only as needed to complete the trip.
 Service providers: we use trusted partners for payments, SMS and OTP delivery, maps and navigation, push notifications, cloud hosting and customer support. They receive only the information needed to do their job and must keep it confidential.
 Legal and safety: we may share information with police, courts or government authorities when required by law, or when needed to protect the safety of our riders, drivers or the public.
-Business changes: if ZI CAB is involved in a merger, acquisition or sale of assets, your information may be transferred as part of that transaction under the same protections.
+Business changes: if Connect Bharat is involved in a merger, acquisition or sale of assets, your information may be transferred as part of that transaction under the same protections.
 We do not sell your personal information to anyone.
 
 H. Data Storage and Security
-Your information is stored on secure servers. We use encrypted connections (HTTPS), access controls and OTP-based login to protect it. Only authorised team members who need the information to do their work can access it. No system is completely secure, so please keep your phone and OTPs private and never share your OTP with anyone who calls claiming to be from ZI CAB.
+Your information is stored on secure servers. We use encrypted connections (HTTPS), access controls and OTP-based login to protect it. Only authorised team members who need the information to do their work can access it. No system is completely secure, so please keep your phone and OTPs private and never share your OTP with anyone who calls claiming to be from Connect Bharat.
 
 I. How Long We Keep Your Information
-We keep your information for as long as your account is active and for as long as needed to provide the service. After that, we keep trip, payment and tax records only for the period required by law, and for resolving disputes and preventing fraud. Driver verification documents are kept while the driver is active on the ZI CAB Platform and for the period required by law afterwards.
+We keep your information for as long as your account is active and for as long as needed to provide the service. After that, we keep trip, payment and tax records only for the period required by law, and for resolving disputes and preventing fraud. Driver verification documents are kept while the driver is active on the Connect Bharat Platform and for the period required by law afterwards.
 
 J. Your Rights and Choices
 You can view and update your profile details in the app at any time.
 You can ask us for a copy of your personal information, ask us to correct it, or ask us to delete your account.
 You can turn off promotional notifications in the app or in your phone settings. Service messages about your trips and account will still be sent.
-To delete your account or make any privacy request, email zicabofficial@gmail.com or call +91 8904343123 from your registered mobile number. We will respond within 30 days. Some records may be kept after deletion where the law requires it.
+To delete your account or make any privacy request, email support@bharat.buytogetherindia.com or call +91 8904343123 from your registered mobile number. We will respond within 30 days. Some records may be kept after deletion where the law requires it.
 
 K. Children
-The ZI CAB Platform is intended for users aged 18 and above. Minors may travel only when the booking is made and supervised by a parent or guardian. We do not knowingly collect information from children.
+The Connect Bharat Platform is intended for users aged 18 and above. Minors may travel only when the booking is made and supervised by a parent or guardian. We do not knowingly collect information from children.
 
 L. Third-Party Links and Services
-The ZI CAB Platform may link to or use third-party services such as maps and payment pages. Their use of your information is governed by their own privacy policies.
+The Connect Bharat Platform may link to or use third-party services such as maps and payment pages. Their use of your information is governed by their own privacy policies.
 
 M. Changes to This Policy
-We may update this Policy from time to time. The latest version will always be available at https://zicab.in/privacy with the date it was last updated. If we make important changes, we will notify you in the app or by SMS or email.
+We may update this Policy from time to time. The latest version will always be available at https://bharat.buytogetherindia.com/privacy with the date it was last updated. If we make important changes, we will notify you in the app or by SMS or email.
 
 N. Grievance Officer and Contact
 If you have any question, concern or complaint about this Policy or how your information is handled, please contact:
 Shamsher Mohammed, Founder & CEO
-ZI CAB Technologies Pvt Ltd
+Connect Bharat
 Office No 13, Grand Majestic Mall, Gandhinagar, Bengaluru - 560009, Karnataka, India
 Phone / WhatsApp: +91 8904343123
-Email: zicabofficial@gmail.com
+Email: support@bharat.buytogetherindia.com
 We aim to acknowledge complaints within 48 hours and resolve them within 30 days.

@@ -67,7 +67,7 @@ const driverRegistrationSessionSchema = new mongoose.Schema(
       // vehicleTypeId above is just the first of these.
       //
       // Without this field Mongoose dropped the list on save - silently, since
-      // schemas are strict - so a driver who chose ZI Cab AC and Non-AC
+      // schemas are strict - so a driver who chose Connect Bharat AC and Non-AC
       // finished onboarding with one type and only ever saw that one's ride
       // requests. The apps and the dispatch matching had handled several all
       // along; the list never survived being written down.

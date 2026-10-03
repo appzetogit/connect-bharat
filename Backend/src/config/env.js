@@ -73,7 +73,7 @@ export const env = {
     // Files are stored on this server under Backend/uploads and served by
     // express.static at /uploads. UPLOAD_FOLDER is the default top-level
     // directory; callers usually pass their own.
-    folder: process.env.UPLOAD_FOLDER || 'zicab',
+    folder: process.env.UPLOAD_FOLDER || 'connect-bharat',
     maxBytes: process.env.UPLOAD_MAX_BYTES || '',
   },
   firebase: {

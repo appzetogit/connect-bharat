@@ -460,7 +460,7 @@ export const settleCompletedRideWallet = async ({ rideId }) => {
     // exactly as before. Read here, before the snapshot is replaced below.
     const platformFee = Math.min(Math.max(0, Number(ride.pricingSnapshot?.rider_platform_fee) || 0), fare);
 
-    // A driver on a daily pass keeps the fare: the pass is what ZI CAB earned
+    // A driver on a daily pass keeps the fare: the pass is what Connect Bharat earned
     // from them today. The rider's platform fee is still not theirs, so it is
     // the one part that survives the waiver.
     //

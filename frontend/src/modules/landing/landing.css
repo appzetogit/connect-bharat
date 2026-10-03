@@ -1,6 +1,6 @@
-/* ZI CAB landing styles.
+/* Connect Bharat landing styles.
 
-   Everything below is nested under `.zicab-landing` so it cannot reach the taxi
+   Everything below is nested under `.connect-bharat-landing` so it cannot reach the taxi
    app: both sides use generic class names (`container`, `btn`, `section-title`)
    and the taxi side is Tailwind 4, which an unscoped `*` or `h1` rule would
    restyle wholesale.
@@ -65,13 +65,13 @@
 /* The taxi app enforces its font with `* { font-family: ... !important }`, so the
    landing has to answer in kind. Higher specificity wins between two important
    declarations, which is why the heading rules below still take precedence. All
-   of it stays inside .zicab-landing. */
-.zicab-landing,
-.zicab-landing * {
+   of it stays inside .connect-bharat-landing. */
+.connect-bharat-landing,
+.connect-bharat-landing * {
   font-family: var(--font-main) !important;
 }
 
-.zicab-landing {
+.connect-bharat-landing {
   box-sizing: border-box;
   background-color: var(--bg-light);
   color: var(--text-body);
@@ -80,14 +80,14 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-.zicab-landing *,
-.zicab-landing *::before,
-.zicab-landing *::after {
+.connect-bharat-landing *,
+.connect-bharat-landing *::before,
+.connect-bharat-landing *::after {
   box-sizing: border-box;
 }
 
-.zicab-landing {
-  /* ZI CAB Custom CSS Design System */
+.connect-bharat-landing {
+  /* Connect Bharat Custom CSS Design System */
 
 
   /* Display type: tighter tracking and optical sizing at large sizes. Default

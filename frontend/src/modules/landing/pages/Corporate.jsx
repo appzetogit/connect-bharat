@@ -49,7 +49,7 @@ const Corporate = () => {
           <div className="corp-info">
             <h2 className="section-title">{corporatePage.benefitsHeading}</h2>
             <p className="body-text">
-              Managing corporate travel expenses and ensuring employee safety can be challenging. ZI CAB simplifies B2B travel with automated booking tools, zero surge pricing, and customized billing contracts.
+              Managing corporate travel expenses and ensuring employee safety can be challenging. Connect Bharat simplifies B2B travel with automated booking tools, zero surge pricing, and customized billing contracts.
             </p>
 
             <div className="benefits-column">
@@ -151,7 +151,7 @@ const Corporate = () => {
       </section>
 
       <style>{`
-        .zicab-landing {
+        .connect-bharat-landing {
           .corp-grid {
             display: grid;
             grid-template-columns: 1.1fr 0.9fr;

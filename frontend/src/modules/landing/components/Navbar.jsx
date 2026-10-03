@@ -107,7 +107,7 @@ const Navbar = ({ activeTab, setActiveTab, openBookingModal }) => {
       )}
 
       <style>{`
-        .zicab-landing {
+        .connect-bharat-landing {
           .navbar-header {
             background-color: #0B1F3A;
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);

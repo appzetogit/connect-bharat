@@ -1,39 +1,39 @@
 TERMS AND CONDITIONS
 Last updated: 22 September 2026
 
-These Terms and Conditions ("Terms") govern your use of the ZI CAB rider app, the ZI CAB driver app and our website at https://zicab.in (together, the "ZI CAB Platform"), operated by ZI CAB Technologies Pvt Ltd ("ZI CAB", "we", "us" or "our").
+These Terms and Conditions ("Terms") govern your use of the Connect Bharat rider app, the Connect Bharat driver app and our website at https://bharat.buytogetherindia.com (together, the "Connect Bharat Platform"), operated by Connect Bharat ("Connect Bharat", "we", "us" or "our").
 
-This document is an electronic record under the Information Technology Act, 2000 and the rules made under it, and does not require a physical or digital signature. By creating an account or using the ZI CAB Platform, you agree to these Terms and to our Privacy Policy at https://zicab.in/privacy. If you do not agree, please do not use the ZI CAB Platform.
+This document is an electronic record under the Information Technology Act, 2000 and the rules made under it, and does not require a physical or digital signature. By creating an account or using the Connect Bharat Platform, you agree to these Terms and to our Privacy Policy at https://bharat.buytogetherindia.com/privacy. If you do not agree, please do not use the Connect Bharat Platform.
 
-A. About ZI CAB
-ZI CAB Technologies Pvt Ltd
+A. About Connect Bharat
+Connect Bharat
 Founder & CEO: Shamsher Mohammed
 Office No 13, Grand Majestic Mall, Gandhinagar, Bengaluru - 560009, Karnataka, India
 Phone / WhatsApp: +91 8904343123
-Email: zicabofficial@gmail.com
+Email: support@bharat.buytogetherindia.com
 
-B. What ZI CAB Does
-ZI CAB is a technology platform that connects riders who need transport or parcel delivery with independent drivers and vehicle owners who provide those services. Services on the ZI CAB Platform may include city rides by bike, auto, cab and other vehicle types, outstation and rental trips, and parcel delivery, depending on your city.
-Drivers on the ZI CAB Platform are independent service providers and are not employees or agents of ZI CAB. The transport service itself is provided by the driver; ZI CAB provides the technology to book, track, pay for and support that service.
+B. What Connect Bharat Does
+Connect Bharat is a technology platform that connects riders who need transport or parcel delivery with independent drivers and vehicle owners who provide those services. Services on the Connect Bharat Platform may include city rides by bike, auto, cab and other vehicle types, outstation and rental trips, and parcel delivery, depending on your city.
+Drivers on the Connect Bharat Platform are independent service providers and are not employees or agents of Connect Bharat. The transport service itself is provided by the driver; Connect Bharat provides the technology to book, track, pay for and support that service.
 
 C. Definitions
-"Rider" means a person who books a ride or parcel delivery through the ZI CAB Platform.
-"Driver" means a person, and where applicable the vehicle owner, registered on the ZI CAB Platform to provide rides or deliveries.
-"Trip" means a ride or delivery booked through the ZI CAB Platform, from acceptance by a driver until completion or cancellation.
+"Rider" means a person who books a ride or parcel delivery through the Connect Bharat Platform.
+"Driver" means a person, and where applicable the vehicle owner, registered on the Connect Bharat Platform to provide rides or deliveries.
+"Trip" means a ride or delivery booked through the Connect Bharat Platform, from acceptance by a driver until completion or cancellation.
 "Fare" means the amount payable by the rider for a trip, including any applicable taxes, tolls, parking and other charges shown in the app.
-"Wallet" means the ZI CAB in-app wallet used for payments, refunds, earnings and fees.
+"Wallet" means the Connect Bharat in-app wallet used for payments, refunds, earnings and fees.
 
 D. Eligibility and Your Account
 You must be at least 18 years old and legally able to enter into a contract under Indian law to create an account. Minors may travel only on a booking made and supervised by a parent or guardian.
-You sign in with your mobile number and a one-time password (OTP). You are responsible for all activity on your account. Do not share your OTP with anyone - ZI CAB will never ask you for it by phone.
+You sign in with your mobile number and a one-time password (OTP). You are responsible for all activity on your account. Do not share your OTP with anyone - Connect Bharat will never ask you for it by phone.
 The information you give us must be true, complete and kept up to date. We may suspend or close accounts that use false information, belong to someone else, or are used for fraud.
 Each person may hold only one rider account and one driver account.
 
 E. Booking a Trip
-When you enter your pickup and drop locations and choose a vehicle type, the app shows you the fare before you confirm. By confirming, you ask ZI CAB to find a nearby driver for you.
+When you enter your pickup and drop locations and choose a vehicle type, the app shows you the fare before you confirm. By confirming, you ask Connect Bharat to find a nearby driver for you.
 A booking is confirmed only when a driver accepts it. The app then shows the driver's name, photo, vehicle number, rating and live location.
 Every trip has a ride OTP. Share it with the driver only after you have checked that the vehicle number matches the app and you are inside the correct vehicle. The trip starts only once the correct OTP is entered.
-ZI CAB does not guarantee that a driver will be available for every request, or the time a driver will take to arrive.
+Connect Bharat does not guarantee that a driver will be available for every request, or the time a driver will take to arrive.
 
 F. Fares and Adding to Your Fare
 Fares are calculated from the vehicle type, distance, estimated time and the pricing set for your city and zone. The fare shown before booking may change if you change the drop location, add stops, wait beyond the free waiting time, or take a significantly different route at your request.
@@ -42,9 +42,9 @@ Where the option is available, you may add a fixed amount to your fare while you
 For outstation, rental and night trips, additional charges such as driver allowance, night charges and extra kilometre or extra hour charges may apply as shown in the app before booking.
 
 G. Payments
-You can pay by cash, UPI, card, net banking or ZI CAB Wallet, as available in your city. Online payments are processed by licensed third-party payment partners; ZI CAB does not store your full card number or UPI PIN.
+You can pay by cash, UPI, card, net banking or Connect Bharat Wallet, as available in your city. Online payments are processed by licensed third-party payment partners; Connect Bharat does not store your full card number or UPI PIN.
 For cash trips, pay the driver the exact fare shown in the app at the end of the trip. Do not pay any amount that is not shown in the app.
-Wallet balances are not interest-bearing, cannot be transferred to another person, and can be used only on the ZI CAB Platform, subject to applicable law.
+Wallet balances are not interest-bearing, cannot be transferred to another person, and can be used only on the Connect Bharat Platform, subject to applicable law.
 If a payment fails or is charged twice, contact support with the trip details and we will investigate.
 
 H. Cancellations
@@ -54,14 +54,14 @@ Drivers who repeatedly cancel accepted trips without a valid reason may be charg
 
 I. Refunds
 If you were charged incorrectly, charged for a trip that did not take place, or charged twice, contact support within 7 days of the trip.
-Approved refunds are returned to the original payment method or to your ZI CAB Wallet, usually within 5-7 working days depending on your bank or payment provider.
-Cash payments cannot be refunded as cash; approved amounts are credited to your ZI CAB Wallet.
+Approved refunds are returned to the original payment method or to your Connect Bharat Wallet, usually within 5-7 working days depending on your bank or payment provider.
+Cash payments cannot be refunded as cash; approved amounts are credited to your Connect Bharat Wallet.
 
 J. Parcel Delivery
 You are responsible for the accuracy of the sender and receiver details and for describing the item correctly.
 You must not send prohibited items, including cash, jewellery, precious metals, illegal drugs, alcohol where restricted, weapons, explosives, flammable or hazardous materials, live animals, perishable food not properly packed, or any item banned by law.
 Items must be packed securely and must fit safely on the chosen vehicle. The driver may refuse any parcel that is unsafe, oversized or appears to contain prohibited items.
-ZI CAB's liability for loss of or damage to a parcel, where proven to be caused during the trip, is limited to the lower of the declared value or Rs 5,000, unless otherwise agreed in writing.
+Connect Bharat's liability for loss of or damage to a parcel, where proven to be caused during the trip, is limited to the lower of the declared value or Rs 5,000, unless otherwise agreed in writing.
 
 K. Rider Conduct
 Treat drivers with respect. Abuse, harassment, threats, violence or discrimination of any kind will lead to immediate suspension.
@@ -72,52 +72,52 @@ Do not book trips for unlawful purposes or to transport prohibited goods.
 
 L. Driver Terms
 Drivers must hold a valid driving licence for the vehicle class, and the vehicle must have a valid registration certificate, insurance, fitness certificate, pollution certificate and permit where the law requires them. All documents must be uploaded in the driver app and kept up to date.
-ZI CAB verifies documents before activating a driver account and may re-verify them at any time. An account may be suspended if any document expires or is found to be false.
+Connect Bharat verifies documents before activating a driver account and may re-verify them at any time. An account may be suspended if any document expires or is found to be false.
 Drivers are independent service providers. They decide when to go online, which requests to accept, and are responsible for their own vehicle, fuel, maintenance, taxes and legal compliance.
 Drivers must follow all traffic laws, drive safely, keep the vehicle clean and roadworthy, collect only the fare shown in the app, and never ask the rider for extra money.
 Drivers must use the ride OTP to start each trip and must complete the trip on the route shown in the app unless the rider asks otherwise.
-ZI CAB charges drivers a commission or platform fee on trips, as shown in the driver app. Fees and dues are adjusted against the driver's ZI CAB Wallet. A driver whose wallet falls below the minimum balance set by ZI CAB may not receive new trips until it is recharged.
-Earnings from online payments are credited to the driver's ZI CAB Wallet and can be withdrawn to the driver's registered bank account or UPI ID, subject to verification.
+Connect Bharat charges drivers a commission or platform fee on trips, as shown in the driver app. Fees and dues are adjusted against the driver's Connect Bharat Wallet. A driver whose wallet falls below the minimum balance set by Connect Bharat may not receive new trips until it is recharged.
+Earnings from online payments are credited to the driver's Connect Bharat Wallet and can be withdrawn to the driver's registered bank account or UPI ID, subject to verification.
 While a driver is online, the driver app collects their location, including in the background, to offer nearby trips and show their position to riders. See our Privacy Policy for details.
 Drivers must not share their account, allow another person to drive using their account, or use any other vehicle than the one registered.
 
 M. Ratings and Feedback
-Riders and drivers can rate each other after each trip. Ratings help keep the ZI CAB Platform safe and reliable. Accounts with consistently low ratings or repeated complaints may be reviewed, restricted or suspended.
+Riders and drivers can rate each other after each trip. Ratings help keep the Connect Bharat Platform safe and reliable. Accounts with consistently low ratings or repeated complaints may be reviewed, restricted or suspended.
 
 N. Safety
 The apps include safety features such as live trip tracking, ride OTP, driver and vehicle details, and an SOS option. In an emergency, always call 112 first.
-If you feel unsafe or face any incident during a trip, report it to ZI CAB immediately on +91 8904343123 or zicabofficial@gmail.com. We will investigate and may share information with the police where required by law.
+If you feel unsafe or face any incident during a trip, report it to Connect Bharat immediately on +91 8904343123 or support@bharat.buytogetherindia.com. We will investigate and may share information with the police where required by law.
 
 O. Lost Items
-ZI CAB is not responsible for items left in a vehicle. If you lose something, contact support with the trip details and we will try to put you in touch with the driver to arrange its return. A return delivery charge may apply.
+Connect Bharat is not responsible for items left in a vehicle. If you lose something, contact support with the trip details and we will try to put you in touch with the driver to arrange its return. A return delivery charge may apply.
 
 P. Suspension and Termination
-You may stop using the ZI CAB Platform and ask us to delete your account at any time by contacting support.
+You may stop using the Connect Bharat Platform and ask us to delete your account at any time by contacting support.
 We may suspend or close any account, without prior notice where necessary, for breach of these Terms, fraud, misuse, unsafe behaviour, repeated cancellations, non-payment of dues, or where required by law.
-Any amounts owed to ZI CAB remain payable after an account is closed.
+Any amounts owed to Connect Bharat remain payable after an account is closed.
 
 Q. Limitation of Liability
-The transport and delivery services are provided by independent drivers. To the maximum extent permitted by law, ZI CAB is not liable for any indirect, incidental or consequential loss, or for loss arising from the acts or omissions of riders or drivers, delays, traffic, weather, or events beyond our reasonable control.
-Where ZI CAB is found liable, our total liability for any claim relating to a trip is limited to the fare paid for that trip, except for parcel claims covered under Section J or where the law does not allow such a limit.
+The transport and delivery services are provided by independent drivers. To the maximum extent permitted by law, Connect Bharat is not liable for any indirect, incidental or consequential loss, or for loss arising from the acts or omissions of riders or drivers, delays, traffic, weather, or events beyond our reasonable control.
+Where Connect Bharat is found liable, our total liability for any claim relating to a trip is limited to the fare paid for that trip, except for parcel claims covered under Section J or where the law does not allow such a limit.
 Nothing in these Terms limits any right you have under the Consumer Protection Act, 2019 or other applicable law.
 
 R. Indemnity
-You agree to indemnify ZI CAB against any claims, losses or penalties arising from your breach of these Terms, your violation of any law, or your misuse of the ZI CAB Platform.
+You agree to indemnify Connect Bharat against any claims, losses or penalties arising from your breach of these Terms, your violation of any law, or your misuse of the Connect Bharat Platform.
 
 S. Intellectual Property
-The ZI CAB name, logo, apps, website and their content belong to ZI CAB Technologies Pvt Ltd. You may use them only to access the ZI CAB Platform for its intended purpose, and may not copy, modify, reverse engineer or resell them.
+The Connect Bharat name, logo, apps, website and their content belong to Connect Bharat. You may use them only to access the Connect Bharat Platform for its intended purpose, and may not copy, modify, reverse engineer or resell them.
 
 T. Changes to the Service and These Terms
-We may change, add or remove features, prices and services from time to time. We may also update these Terms. The latest version will always be available at https://zicab.in/terms with the date it was last updated. If we make important changes we will notify you in the app, by SMS or by email. Continuing to use the ZI CAB Platform after the changes take effect means you accept them.
+We may change, add or remove features, prices and services from time to time. We may also update these Terms. The latest version will always be available at https://bharat.buytogetherindia.com/terms with the date it was last updated. If we make important changes we will notify you in the app, by SMS or by email. Continuing to use the Connect Bharat Platform after the changes take effect means you accept them.
 
 U. Governing Law and Disputes
 These Terms are governed by the laws of India. Any dispute will first be attempted to be resolved amicably through our grievance process below. If it cannot be resolved, the courts at Bengaluru, Karnataka will have exclusive jurisdiction, subject to your rights under consumer protection law.
 
 V. Grievance Officer and Contact
-For any question, complaint or grievance about these Terms or the ZI CAB Platform, please contact:
+For any question, complaint or grievance about these Terms or the Connect Bharat Platform, please contact:
 Shamsher Mohammed, Founder & CEO
-ZI CAB Technologies Pvt Ltd
+Connect Bharat
 Office No 13, Grand Majestic Mall, Gandhinagar, Bengaluru - 560009, Karnataka, India
 Phone / WhatsApp: +91 8904343123
-Email: zicabofficial@gmail.com
+Email: support@bharat.buytogetherindia.com
 We aim to acknowledge complaints within 48 hours and resolve them within 30 days.

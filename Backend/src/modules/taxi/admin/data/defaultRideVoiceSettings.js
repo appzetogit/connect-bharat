@@ -28,9 +28,9 @@ export const createDefaultRideVoiceSettings = () => ({
     /// driver acceptance.
     delay_minutes: 5,
     messages: {
-      en: 'Ladies and gentlemen, welcome aboard Zi Cab. Sit back and relax. We expect to reach your destination in approximately {minutes} minutes. Thank you.',
-      hi: 'लेडीज एंड जेंटलमैन, Zi Cab में आपका स्वागत है। आराम से बैठें। हम लगभग {minutes} मिनट में आपकी मंजिल तक पहुंच जाएंगे। धन्यवाद।',
-      kn: 'ಪ್ರಿಯ ಗ್ರಾಹಕರೇ, Zi Cab ಗೆ ಸ್ವಾಗತ. ಆರಾಮವಾಗಿರಿ. ನಾವು ಸುಮಾರು {minutes} ನಿಮಿಷಗಳಲ್ಲಿ ನಿಮ್ಮ ಗಮ್ಯಸ್ಥಾನವನ್ನು ತಲುಪುತ್ತೇವೆ. ಧನ್ಯವಾದಗಳು.',
+      en: 'Ladies and gentlemen, welcome aboard Connect Bharat. Sit back and relax. We expect to reach your destination in approximately {minutes} minutes. Thank you.',
+      hi: 'लेडीज एंड जेंटलमैन, Connect Bharat में आपका स्वागत है। आराम से बैठें। हम लगभग {minutes} मिनट में आपकी मंजिल तक पहुंच जाएंगे। धन्यवाद।',
+      kn: 'ಪ್ರಿಯ ಗ್ರಾಹಕರೇ, Connect Bharat ಗೆ ಸ್ವಾಗತ. ಆರಾಮವಾಗಿರಿ. ನಾವು ಸುಮಾರು {minutes} ನಿಮಿಷಗಳಲ್ಲಿ ನಿಮ್ಮ ಗಮ್ಯಸ್ಥಾನವನ್ನು ತಲುಪುತ್ತೇವೆ. ಧನ್ಯವಾದಗಳು.',
     },
   },
 
@@ -53,9 +53,9 @@ export const createDefaultRideVoiceSettings = () => ({
     /// Spoken once, the first time the remaining ETA drops to or below this.
     trigger_remaining_minutes: 10,
     messages: {
-      en: 'Attention, Zi Cab will be arriving at your destination in {minutes} minutes. Please check your belongings. It was a pleasure serving you. Thank you.',
-      hi: 'ध्यान दें, Zi Cab {minutes} मिनट में आपकी मंजिल तक पहुंच जाएगी। अपना सामान चेक कर लें। आपके साथ सफर करके अच्छा लगा। शुक्रिया।',
-      kn: 'ಗಮನಿಸಿ, Zi Cab ಇನ್ನು {minutes} ನಿಮಿಷಗಳಲ್ಲಿ ನಿಮ್ಮ ಗಮ್ಯಸ್ಥಾನವನ್ನು ತಲುಪಲಿದೆ. ನಿಮ್ಮ ಸಾಮಗ್ರಿಗಳನ್ನು ಪರಿಶೀಲಿಸಿ. ನಿಮ್ಮೊಂದಿಗೆ ಪ್ರಯಾಣಿಸಿದ್ದು ನಮಗೆ ಸಂತೋಷ. ಧನ್ಯವಾದಗಳು.',
+      en: 'Attention, Connect Bharat will be arriving at your destination in {minutes} minutes. Please check your belongings. It was a pleasure serving you. Thank you.',
+      hi: 'ध्यान दें, Connect Bharat {minutes} मिनट में आपकी मंजिल तक पहुंच जाएगी। अपना सामान चेक कर लें। आपके साथ सफर करके अच्छा लगा। शुक्रिया।',
+      kn: 'ಗಮನಿಸಿ, Connect Bharat ಇನ್ನು {minutes} ನಿಮಿಷಗಳಲ್ಲಿ ನಿಮ್ಮ ಗಮ್ಯಸ್ಥಾನವನ್ನು ತಲುಪಲಿದೆ. ನಿಮ್ಮ ಸಾಮಗ್ರಿಗಳನ್ನು ಪರಿಶೀಲಿಸಿ. ನಿಮ್ಮೊಂದಿಗೆ ಪ್ರಯಾಣಿಸಿದ್ದು ನಮಗೆ ಸಂತೋಷ. ಧನ್ಯವಾದಗಳು.',
     },
   },
 

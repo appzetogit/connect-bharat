@@ -5,7 +5,7 @@ import { adminService } from '../../services/adminService';
 import { uploadService } from '../../../../shared/services/uploadService';
 
 /**
- * Editor for the public marketing site (zicab.in).
+ * Editor for the public marketing site (bharat.buytogetherindia.com).
  *
  * Mirrors the backend's section whitelist in landingContentService.js — adding a
  * section means updating the model, that whitelist, defaultLandingContent.js and
@@ -42,7 +42,7 @@ const SECTIONS = [
   {
     key: 'valueProps',
     title: 'Why Choose Us',
-    help: 'The "Why Choose ZI CAB?" cards.',
+    help: 'The "Why Choose Connect Bharat?" cards.',
     itemLabel: 'point',
     fields: [
       { name: 'title', label: 'Title', placeholder: 'Verified & Trained Drivers' },
@@ -92,23 +92,23 @@ const CONTACT_FIELDS = [
   { name: 'tollFree', label: 'Toll-Free Number', placeholder: '1800 200 9999' },
   { name: 'whatsappDisplay', label: 'WhatsApp (displayed)', placeholder: '+91 98765 00000' },
   { name: 'whatsapp', label: 'WhatsApp (dial format)', placeholder: '919876500000', help: 'Country code, digits only — used to build the wa.me link.' },
-  { name: 'email', label: 'Email', placeholder: 'support@zicab.in' },
+  { name: 'email', label: 'Email', placeholder: 'support@bharat.buytogetherindia.com' },
   { name: 'addressShort', label: 'Short Address', placeholder: 'Grand Majestic Mall, Gandhinagar, Bengaluru', wide: true },
   { name: 'address', label: 'Full Address', placeholder: 'Grand Majestic Mall, Gandhinagar, Bengaluru, Karnataka 560009', wide: true },
   { name: 'mapsUrl', label: 'Google Maps URL', placeholder: 'https://www.google.com/maps/search/?api=1&query=...', wide: true },
 ];
 
 const ABOUT_FIELDS = [
-  { name: 'tag', label: 'Page tag', placeholder: 'About ZI CAB' },
+  { name: 'tag', label: 'Page tag', placeholder: 'About Connect Bharat' },
   { name: 'title', label: 'Page title', placeholder: 'Redefining Premium Cab Services...' },
   { name: 'subtitle', label: 'Page subtitle', wide: true },
   { name: 'foundersTag', label: 'Founders tag', placeholder: 'Leadership' },
   { name: 'foundersHeading', label: 'Founders heading', placeholder: 'Meet the Founders' },
-  { name: 'pillarsHeading', label: 'Pillars heading', placeholder: 'The Pillars of ZI CAB', wide: true },
+  { name: 'pillarsHeading', label: 'Pillars heading', placeholder: 'The Pillars of Connect Bharat', wide: true },
 ];
 
 const SERVICES_PAGE_FIELDS = [
-  { name: 'tag', label: 'Page tag', placeholder: 'ZI CAB Offerings' },
+  { name: 'tag', label: 'Page tag', placeholder: 'Connect Bharat Offerings' },
   { name: 'title', label: 'Page title', placeholder: 'Comprehensive Mobility Services' },
   { name: 'subtitle', label: 'Page subtitle', wide: true },
   { name: 'ctaLabel', label: 'Card button label', placeholder: 'Book This Service' },
@@ -123,14 +123,14 @@ const HERO_FIELDS = [
 ];
 
 const SEO_FIELDS = [
-  { name: 'title', label: 'Browser tab title', placeholder: 'ZI CAB - Your Ride. Our Priority.', wide: true },
-  { name: 'description', label: 'Search description', placeholder: 'ZI CAB - city, outstation and airport cabs...', wide: true },
+  { name: 'title', label: 'Browser tab title', placeholder: 'Connect Bharat - Your Ride. Our Priority.', wide: true },
+  { name: 'description', label: 'Search description', placeholder: 'Connect Bharat - city, outstation and airport cabs...', wide: true },
 ];
 
 const FOOTER_FIELDS = [
-  { name: 'description', label: 'About blurb', placeholder: 'ZI CAB is a premium cab booking platform...', wide: true },
+  { name: 'description', label: 'About blurb', placeholder: 'Connect Bharat is a premium cab booking platform...', wide: true },
   { name: 'servicesHeading', label: 'Services column heading', placeholder: 'Cab Services' },
-  { name: 'copyright', label: 'Copyright line', placeholder: '© 2026 ZI CAB Technologies Pvt Ltd. All Rights Reserved.', wide: true },
+  { name: 'copyright', label: 'Copyright line', placeholder: '© 2026 Connect Bharat. All Rights Reserved.', wide: true },
 ];
 
 const BRAND_FIELDS = [
@@ -541,7 +541,7 @@ export default function LandingContent() {
         <div>
           <h1 className="text-xl font-bold text-gray-900">Website Content</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Controls the public site at zicab.in. Changes appear within about a minute.
+            Controls the public site at bharat.buytogetherindia.com. Changes appear within about a minute.
           </p>
         </div>
         <button

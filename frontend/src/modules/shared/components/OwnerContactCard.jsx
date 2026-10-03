@@ -3,7 +3,7 @@ import { Mail, MapPin, MessageCircle, Phone, UserRound } from 'lucide-react';
 import { useSupportInfo } from '../content/supportInfo';
 
 /**
- * Who runs ZI CAB and how to reach them, shown on the support and legal pages.
+ * Who runs Connect Bharat and how to reach them, shown on the support and legal pages.
  * App stores check that these pages name the business behind the app, so the
  * owner, company, number and address are all spelled out here.
  */

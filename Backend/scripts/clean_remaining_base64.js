@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import fs from 'fs';
 import path from 'path';
 
-await mongoose.connect('mongodb://127.0.0.1:27017/zicab_prod');
+await mongoose.connect('mongodb://127.0.0.1:27017/connect_bharat');
 const db = mongoose.connection.db;
 
 // Clean driver profileImage
@@ -15,9 +15,9 @@ for (const d of driverSample) {
     let ext = match[1] === 'jpeg' ? 'jpg' : match[1];
     const buffer = Buffer.from(match[2], 'base64');
     const filename = `driver-profile-${d._id}.${ext}`;
-    const filePath = `/root/zicab/Backend/uploads/zicab/user-profile/${filename}`;
+    const filePath = `/var/www/connect-bharat/Backend/uploads/connect-bharat/user-profile/${filename}`;
     fs.writeFileSync(filePath, buffer);
-    const url = `https://zicab.in/uploads/zicab/user-profile/${filename}`;
+    const url = `https://bharat.buytogetherindia.com/uploads/connect-bharat/user-profile/${filename}`;
     await drivers.updateOne({ _id: d._id }, { $set: { profileImage: url } });
     console.log(`Updated driver profile image for ${d._id} to ${url}`);
   }
@@ -27,7 +27,7 @@ for (const d of driverSample) {
 const rides = db.collection('taxirides');
 await rides.updateMany(
   { vehicleIconUrl: { $regex: '^data:image' } },
-  { $set: { vehicleIconUrl: 'https://zicab.in/uploads/vehicles/vehicle-default.png' } }
+  { $set: { vehicleIconUrl: 'https://bharat.buytogetherindia.com/uploads/vehicles/vehicle-default.png' } }
 );
 
 await mongoose.disconnect();

@@ -191,7 +191,7 @@ const DriverSubscriptionSettings = () => {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <SectionHeader title="How drivers pay ZI CAB" />
+        <SectionHeader title="How drivers pay Connect Bharat" />
         <div className="px-6">
           <ChoiceRow
             label="Subscription mode"
@@ -206,7 +206,7 @@ const DriverSubscriptionSettings = () => {
           />
           <ToggleRow
             label="Waive commission while a pass is active"
-            hint="Driver keeps the full fare. The rider's platform fee still goes to ZI CAB."
+            hint="Driver keeps the full fare. The rider's platform fee still goes to Connect Bharat."
             checked={isOn(settings.waive_commission)}
             onChange={(value) => set('waive_commission', value ? '1' : '0')}
           />
@@ -231,7 +231,7 @@ const DriverSubscriptionSettings = () => {
             <p className="text-xs text-gray-500 mt-0.5 mb-2">At least one must stay on.</p>
             <div className="flex flex-wrap gap-2">
               {[
-                { value: 'wallet', label: 'ZI CAB wallet balance' },
+                { value: 'wallet', label: 'Connect Bharat wallet balance' },
                 { value: 'gateway', label: 'UPI / card' },
               ].map((option) => (
                 <button

@@ -1,11 +1,11 @@
-# ZI CAB
+# Connect Bharat
 
-Taxi platform plus the ZI CAB marketing site, in one repo.
+Taxi platform plus the Connect Bharat marketing site, in one repo.
 
 ```
 Backend/                    Express + MongoDB + Socket.IO API (also serves the CMS settings)
 frontend/                   React 19 + Vite + Tailwind 4 single-page app
-  src/modules/landing/      the ZI CAB marketing site
+  src/modules/landing/      the Connect Bharat marketing site
   src/modules/{user,driver,admin,shared}/   the taxi product
 ```
 
@@ -14,7 +14,7 @@ frontend/                   React 19 + Vite + Tailwind 4 single-page app
 Mongo first — anything reachable works, this is just the quickest:
 
 ```bash
-docker run -d --name zicab-mongo -p 27017:27017 mongo:7
+docker run -d --name connect-bharat-mongo -p 27017:27017 mongo:7
 ```
 
 Backend:
@@ -79,7 +79,7 @@ the document title.
 
 `logo` and `favicon` there are resolved against the **backend** origin, because
 the CMS serves uploaded assets — pointing them at a frontend-bundled path such as
-`/zicab-logo.jpg` produces a 404. Leave them empty to use the static favicon in
+`/connect-bharat-logo.jpg` produces a 404. Leave them empty to use the static favicon in
 `frontend/index.html`, or upload through the CMS.
 
 ## Routes
@@ -97,7 +97,7 @@ and the navbar highlighting both read from it, so they cannot drift apart.
 ## Two things to know before editing the landing
 
 **Its CSS is scoped.** Everything in `landing.css` and in each page's `<style>`
-block is nested under `.zicab-landing`, applied by `LandingShell`. Both codebases
+block is nested under `.connect-bharat-landing`, applied by `LandingShell`. Both codebases
 use names like `container`, `btn` and `section-title`, and the taxi side is
 Tailwind — unscoped landing rules would restyle the whole product. Keyframes are
 the exception: they are invalid inside a nested rule and their names are global
@@ -105,7 +105,7 @@ either way, so they sit at the top level with a `zc-` prefix.
 
 The taxi app enforces its font with `* { font-family: ... !important }`, so the
 landing's font rules carry `!important` too. Higher specificity settles it
-between them, and all of it stays inside `.zicab-landing`.
+between them, and all of it stays inside `.connect-bharat-landing`.
 
 **Reveals must never strand content.** Elements are visible by default and only
 hidden once `useReveal` confirms it can animate them, and a backstop writes the
@@ -121,4 +121,4 @@ and toll-free number.
 Photos: `frontend/public/drivers/` and `frontend/public/founders/` (see the
 README in each). `frontend/public/vehicles/` currently holds Creative Commons
 photos that require attribution (`ATTRIBUTION.md`) until they are replaced with
-ZI CAB's own fleet shots.
+Connect Bharat's own fleet shots.

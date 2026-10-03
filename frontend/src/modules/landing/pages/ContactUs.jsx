@@ -51,7 +51,7 @@ const ContactUs = () => {
               <span>Calls and WhatsApp on the same number</span>
             </a>
 
-            <a className="c-info-card" href={waLink('Hi ZI CAB, I need help with a booking.')} target="_blank" rel="noreferrer">
+            <a className="c-info-card" href={waLink('Hi Connect Bharat, I need help with a booking.')} target="_blank" rel="noreferrer">
               <div className="c-icon-wrap">
                 <MessageSquare size={24} color="#00BBA9" />
               </div>
@@ -238,7 +238,7 @@ const ContactUs = () => {
       </section>
 
       <style>{`
-        .zicab-landing {
+        .connect-bharat-landing {
           .contact-cards-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);

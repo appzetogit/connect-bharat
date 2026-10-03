@@ -39,7 +39,7 @@ const Driver = () => {
           <span className="page-tag">{driverPage.tag}</span>
           <h1 className="page-title">{driverPage.title}</h1>
           <p className="page-subtitle">
-            Become a ZI CAB Driver Partner. Enjoy daily/weekly settlements, zero arbitrary account blocks, and dedicated support for captains.
+            Become a Connect Bharat Driver Partner. Enjoy daily/weekly settlements, zero arbitrary account blocks, and dedicated support for captains.
           </p>
         </div>
       </div>
@@ -145,7 +145,7 @@ const Driver = () => {
       </section>
 
       <style>{`
-        .zicab-landing {
+        .connect-bharat-landing {
           .driver-grid {
             display: grid;
             grid-template-columns: 1.1fr 0.9fr;

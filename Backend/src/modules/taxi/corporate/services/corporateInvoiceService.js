@@ -55,7 +55,7 @@ const nextInvoiceNumber = async (prefix, date) => {
 
 const loadSupplier = async (settings) => {
   const doc = await AdminBusinessSetting.findOne({ scope: 'default' }).select('general').lean().catch(() => null);
-  const appName = String(doc?.general?.app_name || 'ZI CAB').trim();
+  const appName = String(doc?.general?.app_name || 'Connect Bharat').trim();
   return {
     name: appName,
     legalName: settings.supplier_legal_name || appName,

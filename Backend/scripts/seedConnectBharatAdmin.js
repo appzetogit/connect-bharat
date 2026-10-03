@@ -6,8 +6,8 @@
  * still carries admin@admin.com / 123456 in plain text.
  *
  * Usage:
- *   ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='...' node scripts/seedZicabAdmin.js
- *   ADMIN_NAME='ZI CAB Admin' ...            (optional, defaults below)
+ *   ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='...' node scripts/seedConnectBharatAdmin.js
+ *   ADMIN_NAME='Connect Bharat Admin' ...            (optional, defaults below)
  *
  * Re-running against an existing email resets that account's password rather
  * than creating a duplicate.
@@ -25,7 +25,7 @@ const MONGO_URI = process.env.MONGODB_URI;
 const MONGO_DB = process.env.MONGODB_DB_NAME || 'appzeto_taxi';
 const ADMIN_EMAIL = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
-const ADMIN_NAME = process.env.ADMIN_NAME || 'ZI CAB Admin';
+const ADMIN_NAME = process.env.ADMIN_NAME || 'Connect Bharat Admin';
 
 if (!MONGO_URI) {
   console.error('MONGODB_URI is not set');

@@ -1104,7 +1104,7 @@ export const saveDriverVehicle = async ({
   const normalizedServiceCategories = normalizeServiceCategories(serviceCategories, registerFor || session.role || 'taxi');
   const normalizedRegisterFor = getPrimaryRegisterFor(normalizedServiceCategories, registerFor || session.role || 'taxi');
   // Drivers can enroll in more than one vehicle category now (e.g. both
-  // ZI Cab AC and ZI Cab Non-AC). Older app builds still send a single
+  // Connect Bharat AC and Connect Bharat Non-AC). Older app builds still send a single
   // `vehicleTypeId`, so that's folded in too — de-duplicated, in case it
   // duplicates one already in the list.
   const normalizedVehicleTypeIds = [

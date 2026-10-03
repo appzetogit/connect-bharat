@@ -75,7 +75,7 @@ const BookingModal = ({ isOpen, onClose, selectedVehicle = null }) => {
         {/* Header */}
         <div className="modal-header">
           <div className="modal-title-group">
-            <span className="modal-badge">ZI CAB Dispatch</span>
+            <span className="modal-badge">Connect Bharat Dispatch</span>
             <h3 className="modal-title">
               {step === 1 && 'Plan Your Ride'}
               {step === 2 && 'Passenger Details'}
@@ -266,7 +266,7 @@ const BookingModal = ({ isOpen, onClose, selectedVehicle = null }) => {
       </div>
 
       <style>{`
-        .zicab-landing {
+        .connect-bharat-landing {
           .modal-overlay {
             position: fixed;
             top: 0;

@@ -20,10 +20,10 @@ const DEFAULT_SETTINGS_CONTEXT = {
   settings: {
     general: {
       // Shown until the CMS responds; settings.general.app_name overrides it.
-      app_name: 'ZI CAB - Your Ride. Our Priority.',
+      app_name: 'Connect Bharat - Your Ride. Our Priority.',
       // Left empty on purpose. These are resolved against BACKEND_ORIGIN because
       // the CMS serves uploaded assets, so a frontend-bundled path like
-      // /zicab-logo.jpg would 404. Empty means the static favicon in index.html
+      // /connect-bharat-logo.jpg would 404. Empty means the static favicon in index.html
       // stands, and a real CMS upload still overrides it.
       logo: '',
       favicon: '',
@@ -264,7 +264,7 @@ export const SettingsProvider = ({ children }) => {
   useEffect(() => {
     // Fallback only — the CMS (settings.general.app_name) still wins when the
     // backend is reachable.
-    const appName = settings.general?.app_name || 'ZI CAB - Your Ride. Our Priority.';
+    const appName = settings.general?.app_name || 'Connect Bharat - Your Ride. Our Priority.';
     document.title = appName;
 
     const favicon = settings.general?.favicon || settings.customization?.favicon;

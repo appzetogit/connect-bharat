@@ -16,9 +16,9 @@ const SMS_INDIA_HUB_ENDPOINT = 'http://cloud.smsindiahub.in/vendorsms/pushsms.as
 const getAppName = async () => {
   try {
     const doc = await AdminBusinessSetting.findOne({ scope: 'default' }).select('general.app_name').lean();
-    return String(doc?.general?.app_name || 'ZI CAB').trim();
+    return String(doc?.general?.app_name || 'Connect Bharat').trim();
   } catch {
-    return 'ZI CAB';
+    return 'Connect Bharat';
   }
 };
 

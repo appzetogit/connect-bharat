@@ -66,7 +66,7 @@ export const LANDING_FALLBACK = {
   ],
 
   contact: {
-    email: 'zicabofficial@gmail.com',
+    email: 'support@bharat.buytogetherindia.com',
     whatsapp: '918904343123',
     whatsappDisplay: '+91 8904343123',
     // No toll-free line yet. Every "call us" link dials this field, so it holds
@@ -90,7 +90,7 @@ export const LANDING_FALLBACK = {
     wordmarkPrimary: 'ZI',
     wordmarkSecondary: 'CAB',
     tagline: 'Your Ride. Our Priority.',
-    appBlurb: 'Book rides in seconds, track drivers live, and manage invoices with the ZI CAB app.',
+    appBlurb: 'Book rides in seconds, track drivers live, and manage invoices with the Connect Bharat app.',
     playStoreUrl: '',
     appStoreUrl: '',
     playStoreQr: '',
@@ -113,7 +113,7 @@ export const LANDING_FALLBACK = {
 
   footer: {
     description:
-      'ZI CAB is a premium cab booking platform providing safe, transparent, and 24x7 verified rides — now live in Bengaluru, Mangaluru and Hubballi.',
+      'Connect Bharat is a premium cab booking platform providing safe, transparent, and 24x7 verified rides — now live in Bengaluru, Mangaluru and Hubballi.',
     servicesHeading: 'Cab Services',
     cabServices: [
       { label: 'City Ride (Local Cabs)' },
@@ -127,17 +127,17 @@ export const LANDING_FALLBACK = {
       { label: 'Verified Drivers' },
       { label: '24x7 Live SOS' },
     ],
-    copyright: '© 2026 ZI CAB Technologies Pvt Ltd. All Rights Reserved.',
+    copyright: '© 2026 Connect Bharat. All Rights Reserved.',
   },
 
   seo: {
-    title: 'ZI CAB - Your Ride. Our Priority.',
+    title: 'Connect Bharat - Your Ride. Our Priority.',
     description:
-      'ZI CAB - city, outstation and airport cabs with verified drivers and 24x7 support. Now live in Bengaluru, Mangaluru and Hubballi.',
+      'Connect Bharat - city, outstation and airport cabs with verified drivers and 24x7 support. Now live in Bengaluru, Mangaluru and Hubballi.',
   },
 
   about: {
-    tag: 'About ZI CAB',
+    tag: 'About Connect Bharat',
     title: 'Redefining Premium Cab Services Across Karnataka',
     subtitle:
       'Built on trust, safety, and reliability. Seamless city, outstation and airport rides — now live in Bengaluru, Mangaluru and Hubballi.',
@@ -152,7 +152,7 @@ export const LANDING_FALLBACK = {
     founders: [
       { name: 'Shamsher Mohammed', role: 'Founder & CEO', photo: '', bio: '', linkedin: '' },
     ],
-    pillarsHeading: 'The Pillars of ZI CAB',
+    pillarsHeading: 'The Pillars of Connect Bharat',
     pillars: [
       { icon: 'ShieldCheck', title: 'Safety First', desc: 'All vehicles are equipped with real-time GPS tracking, dual dash cams, and SOS emergency buttons monitored 24x7 by our command center.' },
       { icon: 'Award', title: 'Transparent Pricing', desc: 'Zero surge pricing surprises. What you see during booking is exact fare you pay—inclusive of fuel, toll, and taxes.' },
@@ -162,7 +162,7 @@ export const LANDING_FALLBACK = {
   },
 
   faqs: [
-    { q: 'Does ZI CAB apply surge pricing?', a: 'No. The fare shown at booking is the fare you pay, inclusive of fuel, toll and taxes.' },
+    { q: 'Does Connect Bharat apply surge pricing?', a: 'No. The fare shown at booking is the fare you pay, inclusive of fuel, toll and taxes.' },
     { q: 'What is the cancellation policy?', a: 'Cancellations made within the free window carry no charge. After that, the applicable cancellation fee is shown before you confirm.' },
     { q: 'How do airport pickups work?', a: 'Your driver tracks the flight and waits in the designated pickup area. Free waiting time applies from the time of landing.' },
     { q: 'Which payment methods are accepted?', a: 'Cash to driver, Google Pay, PhonePe, Paytm, credit and debit cards, and net banking.' },
@@ -170,7 +170,7 @@ export const LANDING_FALLBACK = {
   ],
 
   servicesPage: {
-    tag: 'ZI CAB Offerings',
+    tag: 'Connect Bharat Offerings',
     title: 'Comprehensive Mobility Services',
     subtitle:
       'Whether for daily city commute, airport runs, or outstation family road trips, we have the ideal vehicle and service for you.',
@@ -211,11 +211,11 @@ export const LANDING_FALLBACK = {
   },
 
   corporatePage: {
-    tag: 'ZI CAB Business',
+    tag: 'Connect Bharat Business',
     title: 'Enterprise Mobility & Corporate Cab Solutions',
     subtitle:
       'Streamline business travel, airport transfers, and employee commuting with India\u2019s most dependable corporate cab network.',
-    benefitsHeading: 'Why 200+ Enterprises Choose ZI CAB',
+    benefitsHeading: 'Why 200+ Enterprises Choose Connect Bharat',
     formTitle: 'Request a Corporate Demo',
     formSubtitle: 'Get custom pricing rates for your company in 2 hours.',
     benefits: [
@@ -228,8 +228,8 @@ export const LANDING_FALLBACK = {
 
   partnerPage: {
     tag: 'Attach Cabs & Earn',
-    title: 'Partner With ZI CAB Fleet Network',
-    perksHeading: 'Why Fleet Owners Trust ZI CAB',
+    title: 'Partner With Connect Bharat Fleet Network',
+    perksHeading: 'Why Fleet Owners Trust Connect Bharat',
     earningsHeading: 'Est. Monthly Earnings Calculator',
     formTitle: 'Attach Your Cab Today',
     formSubtitle: 'Fill the form below to receive callback within 30 minutes.',
@@ -247,15 +247,15 @@ export const LANDING_FALLBACK = {
   },
 
   driverPage: {
-    tag: 'Join ZI CAB Captains',
+    tag: 'Join Connect Bharat Captains',
     title: 'Drive With Dignity, Security & Higher Income',
-    perksHeading: 'Captain Benefits at ZI CAB',
+    perksHeading: 'Captain Benefits at Connect Bharat',
     docsHeading: 'Documents Required for Verification',
     formTitle: 'Driver Onboarding Form',
-    formSubtitle: 'Start driving with ZI CAB within 24 hours.',
+    formSubtitle: 'Start driving with Connect Bharat within 24 hours.',
     perks: [
       { icon: 'Clock', title: 'Flexible Shift Timings', desc: 'Choose your own operating hours. Drive outstation long trips or local airport runs whenever you wish.' },
-      { icon: 'Shield', title: '\u20b95 Lakh Insurance Cover', desc: 'Free accidental insurance and medical assistance for every active ZI CAB driver partner.' },
+      { icon: 'Shield', title: '\u20b95 Lakh Insurance Cover', desc: 'Free accidental insurance and medical assistance for every active Connect Bharat driver partner.' },
       { icon: 'Award', title: 'Zero Dry-Run Guarantee', desc: 'Outstation trips are optimized with return bookings to save fuel and maximize profit per trip.' },
     ],
     requiredDocs: [
@@ -268,7 +268,7 @@ export const LANDING_FALLBACK = {
   },
 
   advertisePage: {
-    tag: 'Advertise with ZI CAB',
+    tag: 'Advertise with Connect Bharat',
     title: 'Reach Riders Where Their Attention Already Is',
     inventoryTag: 'Inventory',
     inventoryHeading: 'Where Your Brand Can Appear',
@@ -278,11 +278,11 @@ export const LANDING_FALLBACK = {
     formTitle: 'Advertising Enquiry',
     placements: [
       { icon: 'Smartphone', title: 'Mobile App', desc: 'In-app placements across the rider journey \u2014 from app open to ride completion.', formats: ['Splash / app-open ad', 'In-feed native card', 'Ride-summary banner'] },
-      { icon: 'Globe', title: 'Website', desc: 'Placements on zicab.in pages, seen by riders comparing fares and booking online.', formats: ['Leaderboard banner', 'Sidebar tile', 'Sponsored service block'] },
+      { icon: 'Globe', title: 'Website', desc: 'Placements on bharat.buytogetherindia.com pages, seen by riders comparing fares and booking online.', formats: ['Leaderboard banner', 'Sidebar tile', 'Sponsored service block'] },
       { icon: 'Car', title: 'Driver App', desc: 'Reach our driver-partner network \u2014 ideal for fuel, tyres, insurance, EMI and F&B brands.', formats: ['Driver home banner', 'Duty start/end card', 'Partner offer wall'] },
       { icon: 'Image', title: 'Home Screen Banners', desc: 'The highest-visibility slot on the app \u2014 every rider sees it before booking.', formats: ['Hero carousel slide', 'Static top banner', 'City-targeted banner'] },
       { icon: 'CheckCircle2', title: 'Booking Confirmation Screen', desc: 'Shown at peak attention, right after a booking is confirmed and while the rider waits.', formats: ['Confirmation card ad', 'While you wait tile', 'Nearby-brand suggestion'] },
-      { icon: 'Gift', title: 'Offers & Promotions', desc: 'Co-branded coupons and cashback that ride along with a ZI CAB trip.', formats: ['Coupon in offers tab', 'Co-branded promo code', 'Ride-and-win campaign'] },
+      { icon: 'Gift', title: 'Offers & Promotions', desc: 'Co-branded coupons and cashback that ride along with a Connect Bharat trip.', formats: ['Coupon in offers tab', 'Co-branded promo code', 'Ride-and-win campaign'] },
       { icon: 'BellRing', title: 'Push Notifications', desc: 'Opt-in, frequency-capped pushes segmented by city, ride type and rider behaviour.', formats: ['Sponsored push', 'Geo-fenced alert', 'Weekend campaign blast'] },
     ],
     industries: [

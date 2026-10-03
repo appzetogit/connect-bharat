@@ -30,7 +30,7 @@ const readMailSettings = async () => {
     secure: encryption === 'ssl' || port === 465,
     user: pick(mail.mail_username, process.env.EMAIL_USER),
     pass: pick(mail.mail_password, process.env.EMAIL_PASS),
-    fromName: pick(mail.mail_from_name, process.env.APP_NAME || 'ZI CAB'),
+    fromName: pick(mail.mail_from_name, process.env.APP_NAME || 'Connect Bharat'),
     fromAddress: pick(mail.mail_from_address, process.env.EMAIL_FROM || process.env.EMAIL_USER),
   };
 };

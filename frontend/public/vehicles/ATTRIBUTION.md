@@ -11,7 +11,7 @@ Cropping counts as an adaptation, so the CC BY-SA files below keep that licence.
 | `fortuner.jpg` | [TOYOTA FORTUNER (AN150,AN160) China.jpg](https://commons.wikimedia.org/wiki/File:TOYOTA_FORTUNER_(AN150,AN160)_China.jpg) | Dinkun Chen | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) |
 | `innova-crysta.jpg` | [Toyota Innova Crysta 2.4 Z front right.jpg](https://commons.wikimedia.org/wiki/File:Toyota_Innova_Crysta_2.4_Z_front_right.jpg) | Premnath Kudva | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) |
 
-## Recommended: replace these with ZI CAB's own fleet photos
+## Recommended: replace these with Connect Bharat's own fleet photos
 
 Own photos remove every attribution and share-alike obligation, show the actual
 cars customers will ride in, and let you shoot against a plain white wall for the

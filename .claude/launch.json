@@ -2,13 +2,13 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "zicab-frontend",
+      "name": "connect-bharat-frontend",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "frontend", "--", "--port", "5180", "--strictPort"],
       "port": 5180
     },
     {
-      "name": "zicab-prod",
+      "name": "connect-bharat-prod",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "preview", "--prefix", "frontend", "--", "--port", "5190", "--strictPort"],
       "port": 5190

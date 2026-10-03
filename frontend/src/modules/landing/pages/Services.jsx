@@ -111,7 +111,7 @@ const Services = ({ openBookingModal }) => {
       </section>
 
       <style>{`
-        .zicab-landing {
+        .connect-bharat-landing {
           .services-list-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);

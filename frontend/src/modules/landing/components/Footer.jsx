@@ -70,7 +70,7 @@ const Footer = ({ setActiveTab }) => {
               <li><button onClick={() => handleNavClick('corporate')}>Corporate Travel</button></li>
               <li><button onClick={() => handleNavClick('partner')}>Partner With Us</button></li>
               <li><button onClick={() => handleNavClick('driver')}>Attach Driver/Cab</button></li>
-              <li><button onClick={() => handleNavClick('advertise')}>Advertise with ZI CAB</button></li>
+              <li><button onClick={() => handleNavClick('advertise')}>Advertise with Connect Bharat</button></li>
               <li><button onClick={() => handleNavClick('contact')}>Contact Us</button></li>
             </ul>
           </div>
@@ -144,14 +144,14 @@ const Footer = ({ setActiveTab }) => {
             <a href="/refund">Refund & Cancellation</a>
             <span>•</span>
             {/* Required credit for the Creative Commons vehicle photos.
-                Safe to delete once they are replaced with ZI CAB's own fleet photos. */}
+                Safe to delete once they are replaced with Connect Bharat's own fleet photos. */}
             <a href="/vehicles/ATTRIBUTION.md" target="_blank" rel="noreferrer">Photo Credits</a>
           </div>
         </div>
       </div>
 
       <style>{`
-        .zicab-landing {
+        .connect-bharat-landing {
           .footer-container {
             background-color: #07152B;
             color: #94A3B8;

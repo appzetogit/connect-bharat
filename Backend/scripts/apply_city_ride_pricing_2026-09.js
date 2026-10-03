@@ -7,7 +7,7 @@
 //   - Admin Comm. (Owner)  -> fixed Rs 5   (admin_commission_for_owner, type 2)
 //   - The Platform/Third-Party/GST/"Total Admin Charges" breakdown has no
 //     field in the schema - it is cost documentation only, not persisted.
-//   - "ZI XL" applies to both ZI Cab XL and ZI Airport XL.
+//   - "ZI XL" applies to both Connect Bharat XL and ZI Airport XL.
 //
 // Usage:
 //   node scripts/apply_city_ride_pricing_2026-09.js          (dry run)
@@ -45,11 +45,11 @@ const VEHICLE_PRICES = {
   'ZI Auto': { base_price: 59, price_per_distance: 18, waiting_charge: 2 },
   'ZI Auto Fastest': { base_price: 79, price_per_distance: 18, waiting_charge: 2 },
   'ZI Auto + (Pet)': { base_price: 89, price_per_distance: 18, waiting_charge: 2 },
-  'ZI Cab AC': { base_price: 120, price_per_distance: 24, waiting_charge: 3 },
-  'ZI Cab Non-AC': { base_price: 96, price_per_distance: 20, waiting_charge: 3 },
-  'ZI Cab XL': { base_price: 165, price_per_distance: 24, waiting_charge: 5 },
+  'Connect Bharat AC': { base_price: 120, price_per_distance: 24, waiting_charge: 3 },
+  'Connect Bharat Non-AC': { base_price: 96, price_per_distance: 20, waiting_charge: 3 },
+  'Connect Bharat XL': { base_price: 165, price_per_distance: 24, waiting_charge: 5 },
   'ZI Airport XL': { base_price: 165, price_per_distance: 24, waiting_charge: 5 },
-  'ZI Cab Premium': { base_price: 140, price_per_distance: 24, waiting_charge: 5 },
+  'Connect Bharat Premium': { base_price: 140, price_per_distance: 24, waiting_charge: 5 },
 };
 
 const NEW_VEHICLE_NAME = 'ZI Auto + (Pet)';

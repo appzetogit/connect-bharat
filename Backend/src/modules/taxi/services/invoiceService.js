@@ -109,7 +109,7 @@ export const buildInvoiceModel = async ({ rideId }) => {
     parcel: buildParcelDetails(ride),
     invoiceDate: formatDate(ride.completedAt || ride.updatedAt),
     company: {
-      name: String(general.app_name || 'ZI CAB').trim(),
+      name: String(general.app_name || 'Connect Bharat').trim(),
       tagline: String(contact.tagline || 'Reliable rides, simple journeys').trim(),
       address: String(contact.address || '').trim(),
       phone: String(contact.whatsappDisplay || general.contact_phone_1 || '').trim(),

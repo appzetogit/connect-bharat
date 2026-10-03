@@ -7350,7 +7350,7 @@ export const updateDriverVehicle = async (req, res) => {
   } = req.body;
 
   // A driver can be enrolled in more than one vehicle category post-signup
-  // too (e.g. adding ZI Cab Non-AC to an existing ZI Cab AC enrollment) —
+  // too (e.g. adding Connect Bharat Non-AC to an existing Connect Bharat AC enrollment) —
   // mirrors the onboarding vehicle step, which already accepts this shape.
   // The legacy singular `vehicleTypeId` is folded in too, de-duplicated, so
   // older app builds that only ever send that keep working.

@@ -267,7 +267,7 @@ The same data for a native screen:
       "distanceKm": 150.2,
       "durationMinutes": 185,
       "invoiceDate": "3 October 2026",
-      "company": { "name": "ZI CAB", "tagline": "...", "address": "...", "phone": "...", "email": "...", "city": "Bengaluru" },
+      "company": { "name": "Connect Bharat", "tagline": "...", "address": "...", "phone": "...", "email": "...", "city": "Bengaluru" },
       "trip": {
         "customerName": "Asha Rao", "customerEmail": "asha@example.com",
         "driverName": "Ravi", "vehicleNumber": "KA01AB1234",

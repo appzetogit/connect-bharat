@@ -52,7 +52,7 @@ const Advertise = () => {
           <span className="page-tag">{advertisePage.tag}</span>
           <h1 className="page-title">{advertisePage.title}</h1>
           <p className="page-subtitle">
-            Every ZI CAB trip is a captive screen moment. Put your brand in front of riders and
+            Every Connect Bharat trip is a captive screen moment. Put your brand in front of riders and
             driver-partners across our app, website and driver network in Bengaluru, Mangaluru and Hubballi.
           </p>
         </div>
@@ -159,7 +159,7 @@ const Advertise = () => {
                 <h3>Enquiry Received</h3>
                 <p>
                   Thanks, <strong>{contactName || 'there'}</strong>. Our ad sales team will contact{' '}
-                  <strong>{phone}</strong> with the ZI CAB media kit.
+                  <strong>{phone}</strong> with the Connect Bharat media kit.
                 </p>
               </div>
             ) : (
@@ -253,7 +253,7 @@ const Advertise = () => {
       </section>
 
       <style>{`
-        .zicab-landing {
+        .connect-bharat-landing {
           .why-ad-section { background: #FFFFFF; }
 
           .why-ad-grid {

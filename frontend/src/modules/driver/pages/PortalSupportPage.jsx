@@ -5,11 +5,11 @@ import { useSupportInfo } from '../../shared/content/supportInfo';
 import { FaqList, OwnerContactCard } from '../../shared/components/OwnerContactCard';
 
 const DRIVER_FAQ = [
-  { q: 'How do I join ZI CAB as a driver?', a: 'Download the ZI CAB Driver app, sign in with your mobile number, choose your city and vehicle type, and upload your documents. Our team verifies them and activates your account, usually within 24-48 hours.' },
+  { q: 'How do I join Connect Bharat as a driver?', a: 'Download the Connect Bharat Driver app, sign in with your mobile number, choose your city and vehicle type, and upload your documents. Our team verifies them and activates your account, usually within 24-48 hours.' },
   { q: 'Which documents do I need?', a: 'A valid driving licence, vehicle RC, vehicle insurance, Aadhaar, PAN, a clear profile photo and photos of your vehicle. Commercial vehicles also need a valid permit where the city requires one.' },
   { q: 'Why is my account still pending approval?', a: 'Usually because a document is blurred, expired or does not match your details. Check the status screen in the app for the reason, re-upload the document, or call +91 8904343123 for help.' },
   { q: 'How do I get ride requests?', a: 'Go online in the app and keep location turned on. Requests from riders near you appear on screen with the pickup point and fare - tap Accept to take the trip. Keep your wallet above the minimum balance so you stay eligible.' },
-  { q: 'How and when do I get paid?', a: 'Cash trips are paid to you directly by the rider. Online payments and incentives are added to your ZI CAB wallet and can be withdrawn to your registered bank account or UPI ID from the Wallet screen.' },
+  { q: 'How and when do I get paid?', a: 'Cash trips are paid to you directly by the rider. Online payments and incentives are added to your Connect Bharat wallet and can be withdrawn to your registered bank account or UPI ID from the Wallet screen.' },
   { q: 'Why does the app need my location in the background?', a: 'While you are online, your location is used to send you nearby ride requests and to show riders where you are during a trip. Location sharing stops when you go offline.' },
   { q: 'A rider was rude or unsafe. What should I do?', a: 'Use the SOS button in an emergency. For anything else, raise a ticket from Help & Support in the app or call +91 8904343123 with the trip details - every report is reviewed.' },
 ];

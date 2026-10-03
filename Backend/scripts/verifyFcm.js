@@ -5,7 +5,7 @@
  * signer, calls the public HTTPS endpoints, re-reads the documents to confirm
  * the token actually persisted to the right field, then deletes the throwaways.
  *
- * Usage: node scripts/verifyFcm.js https://zicab.in
+ * Usage: node scripts/verifyFcm.js https://bharat.buytogetherindia.com
  */
 import mongoose from 'mongoose';
 import { env } from '../src/config/env.js';
@@ -13,7 +13,7 @@ import { signAccessToken } from '../src/modules/taxi/services/tokenService.js';
 import { User } from '../src/modules/taxi/user/models/User.js';
 import { Driver } from '../src/modules/taxi/driver/models/Driver.js';
 
-const BASE = (process.argv[2] || 'https://zicab.in').replace(/\/$/, '');
+const BASE = (process.argv[2] || 'https://bharat.buytogetherindia.com').replace(/\/$/, '');
 const STAMP = `fcmcheck-${Date.now()}`;
 const results = [];
 

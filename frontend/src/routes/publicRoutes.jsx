@@ -72,7 +72,7 @@ import {
 
 const publicRoutes = (
   <>
-    {/* ZI CAB marketing site: /, /about, /services, /corporate, /partner,
+    {/* Connect Bharat marketing site: /, /about, /services, /corporate, /partner,
         /drive-with-us, /advertise, /contact. It replaces the previous
         LandingPage/AboutPage/ContactPage/ServicesPage, which are left in the
         tree but no longer routed. */}

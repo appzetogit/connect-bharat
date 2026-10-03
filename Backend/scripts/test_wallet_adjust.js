@@ -1,9 +1,9 @@
 
 import mongoose from 'mongoose';
-import { Driver } from '/root/zicab/Backend/src/modules/taxi/driver/models/Driver.js';
-import * as adminService from '/root/zicab/Backend/src/modules/taxi/admin/services/adminService.js';
+import { Driver } from '/var/www/connect-bharat/Backend/src/modules/taxi/driver/models/Driver.js';
+import * as adminService from '/var/www/connect-bharat/Backend/src/modules/taxi/admin/services/adminService.js';
 
-await mongoose.connect('mongodb://127.0.0.1:27017/zicab_prod');
+await mongoose.connect('mongodb://127.0.0.1:27017/connect_bharat');
 
 const driver = await Driver.findOne({ phone: '7470311228' });
 console.log(`Testing with driver ${driver.name} (id: ${driver._id}, current balance: ${driver.wallet?.balance})`);

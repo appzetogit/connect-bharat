@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: '/root/zicab/Backend/.env' });
+dotenv.config({ path: '/var/www/connect-bharat/Backend/.env' });
 
 const APPLY = process.argv.includes('--apply');
 
@@ -84,7 +84,7 @@ const run = async () => {
   }
 
   if (APPLY && backup.length) {
-    const backupPath = `/root/zicab/Backend/parcel-pricing-backup-${Date.now()}.json`;
+    const backupPath = `/var/www/connect-bharat/Backend/parcel-pricing-backup-${Date.now()}.json`;
     fs.writeFileSync(backupPath, JSON.stringify(backup, null, 2));
     console.log(`Backed up ${backup.length} pre-change record(s) to ${backupPath}`);
   }

@@ -137,7 +137,7 @@ const driverSchema = new mongoose.Schema(
     },
     // Every vehicle category this driver is enrolled to receive requests
     // for — a driver can pick more than one at onboarding (e.g. both
-    // ZI Cab AC and ZI Cab Non-AC on the same car). `vehicleTypeId` above
+    // Connect Bharat AC and Connect Bharat Non-AC on the same car). `vehicleTypeId` above
     // is kept in sync as the first entry so every existing single-value
     // read (marker art, profile display, dispatch's driver-card fields)
     // keeps working unchanged.
