@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../../middlewares/authMiddleware.js';
+import { enforceAdminPermissions } from '../../middlewares/adminPermissionMiddleware.js';
 import {
   loginRateLimit,
   otpSendRateLimit,
@@ -276,6 +277,8 @@ adminRouter.post('/admin/reset-password', otpVerifyRateLimit, resetPassword);
 adminRouter.get('/admin/general-settings/:category', getGeneralSettingsCategory);
 
 adminRouter.use('/admin', authenticate(['admin']));
+// Route-level RBAC + req.adminScope for every authenticated /admin route.
+adminRouter.use('/admin', enforceAdminPermissions);
 
 adminRouter.get('/admin/permissions', getAdminPermissions);
 adminRouter.get('/admin/admin-management/admins', getAdmins);

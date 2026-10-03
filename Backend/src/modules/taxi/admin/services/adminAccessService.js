@@ -33,6 +33,17 @@ export const ADMIN_PERMISSIONS = [
   'enquiries.view',
 ];
 
+/// Write counterparts of the `.view` keys, enforced per HTTP method by
+/// middlewares/adminPermissionMiddleware.js. While
+/// `customization.strict_admin_permissions` is '0' a `.view` key also grants
+/// its `.manage` key, so existing subadmins keep the access they have today.
+export const ADMIN_MANAGE_PERMISSIONS = ADMIN_PERMISSIONS
+  .filter((key) => key.endsWith('.view'))
+  .map((key) => key.replace(/\.view$/, '.manage'));
+
+/// Everything an admin can be granted (subadmins.manage appears once).
+export const ALL_ADMIN_PERMISSIONS = [...new Set([...ADMIN_PERMISSIONS, ...ADMIN_MANAGE_PERMISSIONS])];
+
 export const normalizeAdminType = (value = '') =>
   String(value || '').trim().toLowerCase() === 'subadmin' ? 'subadmin' : 'superadmin';
 

@@ -103,6 +103,7 @@ import {
   summarizePhonePeRequestBody,
 } from "../../services/paymentDiagnostics.js";
 import { verifyBankAccountWithRecharge, verifyDrivingLicenseWithRecharge, verifyGstinWithRecharge, verifyPanWithRecharge, verifyRcWithRecharge, verifyUpiWithRecharge } from "../../services/rechargeVerificationService.js";
+import { isCustomizationFlagOn } from "../../services/securitySettingsService.js";
 
 const generateDriverReferralCode = (driver) => {
   const idPart = String(driver?._id || "")
@@ -2775,8 +2776,11 @@ export const registerDriver = async (req, res) => {
     phone,
     password: await hashPassword(password),
     vehicleType,
-    approve: true,
-    status: "approved",
+    // Explicit auto-approve only while the admin hasn't asked for approval;
+    // otherwise leave it to the model default so the policy hook applies.
+    ...((await isCustomizationFlagOn("require_driver_approval"))
+      ? {}
+      : { approve: true, status: "approved" }),
     zoneId: zone?._id || null,
     location: toPoint(coordinates, "location"),
   });
@@ -2810,6 +2814,10 @@ export const loginDriver = async (req, res) => {
 
   if (!driver || !(await comparePassword(password, driver.password))) {
     throw new ApiError(401, "Invalid phone or password");
+  }
+
+  if (String(driver.status || "").toLowerCase() === "blocked") {
+    throw new ApiError(403, "Driver account is blocked");
   }
 
   if (

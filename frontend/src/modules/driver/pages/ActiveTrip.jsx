@@ -1512,7 +1512,7 @@ const ActiveTrip = () => {
         window.open('tel:112', '_self');
     };
 
-    const publishRideStatus = (nextStatus, paymentMode = '') => {
+    const publishRideStatus = (nextStatus, paymentMode = '', otpCode = '') => {
         if (!rideId) {
             return;
         }
@@ -1529,6 +1529,7 @@ const ActiveTrip = () => {
             rideId,
             status: nextStatus,
             paymentMethod: paymentMode || undefined,
+            ...(otpCode ? { otp: otpCode } : {}),
             ...(driverPaymentCollection ? { driverPaymentCollection } : {}),
         });
     };
@@ -1806,9 +1807,29 @@ const ActiveTrip = () => {
             // Fall back to the currently hydrated OTP if the refresh request fails.
         }
 
-        if (String(enteredOtp) !== resolvedExpectedOtp) {
+        const enteredCode = String(enteredOtp);
+
+        // With server-side OTP verification on, the backend no longer sends the
+        // code to the driver app, so the server is the only one who can check it.
+        if (resolvedExpectedOtp && enteredCode !== resolvedExpectedOtp) {
             setOtpError('Wrong PIN. Ask the passenger again.');
             return;
+        }
+
+        let startedOnServer = false;
+
+        if (!resolvedExpectedOtp && rideId) {
+            try {
+                await api.patch(
+                    `/rides/${rideId}/status`,
+                    { status: 'started', otp: enteredCode },
+                    withDriverAuthorization(getLocalDriverToken()),
+                );
+                startedOnServer = true;
+            } catch (error) {
+                setOtpError(error?.message || 'Wrong PIN. Ask the passenger again.');
+                return;
+            }
         }
 
         setOtpError('');
@@ -1834,11 +1855,11 @@ const ActiveTrip = () => {
         }
 
         try {
-            if (rideId) {
+            if (rideId && !startedOnServer) {
                 const driverToken = getLocalDriverToken();
                 await api.patch(
                     `/rides/${rideId}/status`,
-                    { status: 'started' },
+                    { status: 'started', otp: enteredCode },
                     withDriverAuthorization(driverToken),
                 );
             }
@@ -1846,7 +1867,7 @@ const ActiveTrip = () => {
             // Keep the optimistic local state; socket/live hydration will reconcile when available.
         }
 
-        publishRideStatus('started');
+        publishRideStatus('started', '', enteredCode);
     };
 
     useEffect(() => {

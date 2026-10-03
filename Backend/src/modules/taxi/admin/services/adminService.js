@@ -48,6 +48,7 @@ import { TaxiAppModule } from '../models/TaxiAppModule.js';
 import { NotificationChannel } from '../models/NotificationChannel.js';
 import { UserPreference } from '../models/UserPreference.js';
 import { AdminRole } from '../models/AdminRole.js';
+import { mergeScopeIntoQuery, resolveDashboardScopeFilters, resolveUserScopeFilter } from './adminScopeService.js';
 import { PaymentGateway } from '../models/PaymentGateway.js';
 import { PaymentMethod } from '../models/PaymentMethod.js';
 import { OnboardingScreen } from '../models/OnboardingScreen.js';
@@ -3669,6 +3670,7 @@ export const listUsers = async ({
   search = '',
   employeeId = '',
   referralSource = 'all',
+  adminScope = null,
 }) => {
   const safePage = Math.max(1, Number(page) || 1);
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || 50));
@@ -3702,6 +3704,9 @@ export const listUsers = async ({
   } else if (normalizedReferralSource === 'organic') {
     query.acquiredByEmployeeId = null;
   }
+
+  // City scoping for subadmins; {} (no-op) for superadmins and internal callers.
+  Object.assign(query, mergeScopeIntoQuery({}, await resolveUserScopeFilter(adminScope)));
 
   const [users, total] = await Promise.all([
     User.find(query)
@@ -8682,19 +8687,22 @@ const getLiveDashboardStats = async () => {
   };
 };
 
-export const getDashboardData = async () => {
+export const getDashboardData = async ({ adminScope = null } = {}) => {
   const live = await getLiveDashboardStats();
+  // A city-scoped subadmin gets their own numbers, so the shared cache (which
+  // holds the global numbers) is neither read nor written for them.
+  const scope = await resolveDashboardScopeFilters(adminScope);
 
-  if (dashboardCache.value && dashboardCache.expiresAt > Date.now()) {
+  if (!scope.restricted && dashboardCache.value && dashboardCache.expiresAt > Date.now()) {
     return { ...dashboardCache.value, live };
   }
 
   const [totalUsers, totalDrivers, totalOwners, approvedDrivers, rides, supportTicketStats] = await Promise.all([
-    User.countDocuments(),
-    Driver.countDocuments(),
-    Owner.countDocuments(),
-    Driver.countDocuments({ approve: true }),
-    Ride.find()
+    User.countDocuments(scope.user),
+    Driver.countDocuments(scope.driver),
+    Owner.countDocuments(scope.owner),
+    Driver.countDocuments({ approve: true, ...scope.driver }),
+    Ride.find(scope.ride)
       .select('status liveStatus fare paymentMethod commissionAmount driverEarnings driverId createdAt updatedAt completedAt')
       .sort({ createdAt: -1 })
       .lean(),
@@ -8948,10 +8956,12 @@ export const getDashboardData = async () => {
       : 0,
   };
 
-  dashboardCache = {
-    expiresAt: Date.now() + DASHBOARD_CACHE_TTL_MS,
-    value: snapshot,
-  };
+  if (!scope.restricted) {
+    dashboardCache = {
+      expiresAt: Date.now() + DASHBOARD_CACHE_TTL_MS,
+      value: snapshot,
+    };
+  }
 
   return { ...snapshot, live };
 };

@@ -79,6 +79,7 @@ import {
 import { getAppBootstrap, getAppModules, getGeneralSettingsCategory, getGoodsTypes, getPublicRentalVehicleCatalog, getPublicVehicleTypeCatalog, getPublicLandingContent, getPublicLegalContent, submitWebsiteEnquiry } from '../../admin/controllers/adminController.js';
 import { getPublicCancellationReasons } from '../../admin/controllers/cancellationReasonController.js';
 import { triggerUserSosAlert } from '../../safety/controllers/safetyController.js';
+import { requireUploadAuth } from '../../middlewares/uploadAuthMiddleware.js';
 
 export const userRouter = Router();
 
@@ -117,7 +118,7 @@ userRouter.post('/rental-bookings/:id/location', authenticate(['user']), asyncHa
 userRouter.post('/register', asyncHandler(registerUser));
 userRouter.post('/signup', asyncHandler(signupUser));
 userRouter.post('/login', loginRateLimit, asyncHandler(loginUser));
-userRouter.post('/profile-image', asyncHandler(uploadUserProfileImage));
+userRouter.post('/profile-image', requireUploadAuth, asyncHandler(uploadUserProfileImage));
 userRouter.post('/auth/send-otp', otpSendRateLimit, asyncHandler(startUserOtpRequest));
 userRouter.post('/auth/verify-otp', otpVerifyRateLimit, asyncHandler(verifyUserOtpRequest));
 userRouter.post('/otp-login', otpVerifyRateLimit, asyncHandler(verifyUserPhoneForOtpLogin));

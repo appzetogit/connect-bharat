@@ -465,6 +465,8 @@ export const updateRideStatus = async (req, res) => {
     driverId: req.auth.sub,
     nextStatus,
     paymentMethod: req.body.paymentMethod,
+    otp: req.body.otp,
+    dropOtp: req.body.dropOtp,
   });
 
   try {

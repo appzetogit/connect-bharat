@@ -28,6 +28,7 @@ import { findZoneByPickup } from './matchingService.js';
 import { applyRideWaitingCharge, recordWaitingChargeInBreakdown } from './rideWaitingChargeService.js';
 import { applyOutstationFinalFare, assertOutstationOdometer, buildOutstationBookingFields, quoteOutstationFare, serializeOutstationRealtime } from '../outstation/services/outstationHooks.js';
 import { buildDateRangeCondition } from './dateRangeFilter.js';
+import { enforceTripOtp, notifyParcelReceiverOtp } from './tripOtpService.js';
 
 const clearUserActiveRideIfPresent = async (user) => {
   if (!user?.currentRideId) {
@@ -2132,7 +2133,7 @@ export const saveParcelProof = async ({ rideId, driverId, stage, imageUrl }) => 
   return ride;
 };
 
-export const updateRideLifecycle = async ({ rideId, driverId, nextStatus, paymentMethod }) => {
+export const updateRideLifecycle = async ({ rideId, driverId, nextStatus, paymentMethod, otp, dropOtp }) => {
   const config = rideStatusConfig[nextStatus];
 
   if (!config) {
@@ -2151,6 +2152,11 @@ export const updateRideLifecycle = async ({ rideId, driverId, nextStatus, paymen
   if (!config.allowedCurrent.includes(ride.liveStatus)) {
     throw new ApiError(409, `Ride cannot move from ${ride.liveStatus} to ${nextStatus}`);
   }
+
+  // Rider start OTP and parcel receiver OTP; each is a no-op unless its
+  // setting is on. Runs after the transition check so a locked-out or wrong
+  // OTP never masks an illegal transition, and before any field is touched.
+  await enforceTripOtp({ ride, nextStatus, otp, dropOtp });
 
   ride.liveStatus = nextStatus;
   ride.status = config.persistedStatus;
@@ -2179,6 +2185,13 @@ export const updateRideLifecycle = async ({ rideId, driverId, nextStatus, paymen
 
   await ride.save();
   await syncDeliveryWithRide(ride);
+
+  if (nextStatus === RIDE_LIVE_STATUS.STARTED && ride.serviceType === 'parcel') {
+    // Not awaited: an SMS gateway failure must not fail the pickup.
+    notifyParcelReceiverOtp(ride).catch((error) => {
+      console.warn('[trip-otp] receiver OTP not sent for ride', String(ride._id), '-', error?.message);
+    });
+  }
 
   let walletUpdate = null;
 
