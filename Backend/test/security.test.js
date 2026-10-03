@@ -257,10 +257,11 @@ test('scope merges without clobbering an existing search $or', () => {
 
 // ---- Auth roles ----------------------------------------------------------------
 
-test('hub_manager and corporate_admin are reserved but unregistered', () => {
+test('hub_manager and corporate_admin are reserved and registered by their modules', () => {
   assert.equal(AUTH_ROLES.HUB_MANAGER, 'hub_manager');
   assert.equal(AUTH_ROLES.CORPORATE_ADMIN, 'corporate_admin');
-  assert.equal(isAuthRoleRegistered('hub_manager'), false);
+  assert.equal(isAuthRoleRegistered('hub_manager'), true);
+  assert.equal(isAuthRoleRegistered('corporate_admin'), true);
 });
 
 test('registerAuthRole validates and registers a model', () => {

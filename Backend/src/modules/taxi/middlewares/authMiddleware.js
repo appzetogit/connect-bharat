@@ -8,6 +8,7 @@ import { BusDriver } from '../driver/models/BusDriver.js';
 import { PoolingVehicle } from '../admin/models/PoolingVehicle.js';
 import { User } from '../user/models/User.js';
 import { CorporateAdmin } from '../corporate/models/CorporateAdmin.js';
+import { HubStaff } from '../logistics/models/HubStaff.js';
 import { verifyAccessToken } from '../services/tokenService.js';
 import {
   normalizeAdminPermissions,
@@ -28,6 +29,9 @@ const roleModelMap = {
   // once the extensible auth middleware lands; the active/company-status
   // checks live in corporate/middlewares/corporateAccess.js.
   corporate_admin: CorporateAdmin,
+  // Hub panel staff (managers and operators both sign in with this role);
+  // logistics/middleware/hubAuth.js adds the active-account and hub checks.
+  hub_manager: HubStaff,
 };
 
 /// Role names reserved for modules that register their own models (hub panel,

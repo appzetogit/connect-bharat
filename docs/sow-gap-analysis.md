@@ -4,7 +4,16 @@ Source: *Complete Custom (Android & iOS) Application* SOW (Appzeto, "Parcel + Ou
 Scope: **backend only** (`Backend/`). Mobile app screens are the Flutter team's; app items below are judged only on whether the backend API they need exists.
 Paths are relative to `Backend/src/modules/taxi/`.
 
-**Score: 98 line items — 19 Have · 46 Partial · 33 Missing.**
+> **Status (2026-10-03): every gap below has now been built.** The table
+> beneath is the *original* audit, kept for reference. API docs for the Flutter
+> team are in [docs/api/](api/) - pricing, security, payments, user-driver,
+> admin-operations, outstation, rental, corporate, logistics. New behaviour that
+> moves money or changes a live flow ships switched off behind a setting; each
+> doc lists its settings and defaults. Nothing has yet run against a real
+> database or payment gateway - a staging pass is needed before switching
+> features on.
+
+**Score (original audit): 98 line items — 19 Have · 46 Partial · 33 Missing.**
 
 Legend: ✅ Have · 🟡 Partial · ❌ Missing
 

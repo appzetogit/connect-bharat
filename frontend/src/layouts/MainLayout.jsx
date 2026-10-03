@@ -36,7 +36,8 @@ const MainLayout = ({ children }) => {
     location.pathname.startsWith('/user-import') ||
     location.pathname.startsWith('/driver-import') ||
     location.pathname.startsWith('/owner') ||
-    location.pathname.startsWith('/corporate-panel');
+    location.pathname.startsWith('/corporate-panel') ||
+    location.pathname.startsWith('/hub');
 
   const isUserPath = !isAdminPath && !isStaticPath;
   const isSplashPath = location.pathname === '/taxi/user/splash';

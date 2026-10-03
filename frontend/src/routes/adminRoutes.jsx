@@ -1,6 +1,7 @@
 import { lazy } from 'react';
 import { FileText } from 'lucide-react';
 import { Navigate, Route, useLocation, useNavigate } from 'react-router-dom';
+import logisticsAdminRoutes from './logisticsAdminRoutes';
 import {
   AdminAdminCreate,
   AdminAdmins,
@@ -213,6 +214,7 @@ const adminRoutes = (
       <Route path="chat" element={<AdminChat />} />
       <Route path="trips" element={<AdminTrips />} />
       <Route path="deliveries" element={<AdminDeliveries />} />
+      {logisticsAdminRoutes}
       <Route path="ongoing" element={<AdminOngoing />} />
       <Route path="bus-service" element={<AdminBusServiceManager />} />
       <Route path="bus-service/pending-drivers" element={<AdminPendingBusDrivers />} />

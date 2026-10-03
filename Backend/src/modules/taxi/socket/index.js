@@ -27,6 +27,7 @@ import {
   startDispatchFlow,
 } from '../services/dispatchService.js';
 import { findZoneByPickup } from '../services/matchingService.js';
+import { registerLogisticsSocket } from '../logistics/socket.js';
 import { acceptRideAssignment, createRideRecord, getRideRoom, submitRideBid } from '../services/rideService.js';
 import { SOCKET_EVENTS } from './events.js';
 import { registerRideSocketHandlers } from './handlers/rideSocketHandler.js';
@@ -185,6 +186,7 @@ export const configureTaxiSocketServer = async (httpServer) => {
 
     socket.join(getSupportParticipantRoom(identity.role, identity.sub));
     socket.join(getSupportRoleRoom(identity.role));
+    registerLogisticsSocket(socket, identity);
 
     if (identity.role === 'driver') {
       await Driver.findByIdAndUpdate(identity.sub, { socketId: socket.id });

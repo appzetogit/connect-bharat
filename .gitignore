@@ -7,3 +7,6 @@ Thumbs.db
 Appzeto 24_flutter_shell/
 Appzeto 24_driver_webview/
 scratch/
+
+# Agent worktrees (local only)
+.claude/worktrees/

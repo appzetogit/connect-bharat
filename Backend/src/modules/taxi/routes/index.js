@@ -8,6 +8,7 @@ import { commonRouter } from '../common/routes/commonRoutes.js';
 import { careerRouter } from '../career/routes/careerRoutes.js';
 import { outstationRouter } from '../outstation/routes.js';
 import { corporateModuleRouter } from '../corporate/routes/index.js';
+import { logisticsRouter } from '../logistics/routes/index.js';
 
 export const taxiRouter = Router();
 
@@ -22,3 +23,4 @@ taxiRouter.use(supportModuleRouter);
 taxiRouter.use(commonRouter);
 taxiRouter.use(careerRouter);
 taxiRouter.use(outstationRouter);
+taxiRouter.use('/logistics', logisticsRouter);
