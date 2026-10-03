@@ -8,6 +8,8 @@ import { Delivery } from '../models/Delivery.js';
 import { Ride } from '../models/Ride.js';
 import { resolveDeliveryTariff } from '../../services/deliveryTariffService.js';
 import { resolveRouteCached } from '../../services/routeService.js';
+import { computeDirectParcelSurcharges } from '../../logistics/services/directParcelSurcharges.js';
+import { getDeliverySurchargeSettings } from '../../logistics/services/logisticsSettingsService.js';
 import {
   createRideRecord,
   ensureRideParticipantAccess,
@@ -193,7 +195,7 @@ const resolveDeliveryDistance = async (pickupCoords, dropCoords) => {
 
 /// The fare for one parcel: the tariff for the zone it is picked up in, over
 /// the distance resolveDeliveryDistance found.
-const computeDeliveryFareBreakdown = ({ tariff = {}, distanceKm: tripKm = 0 }) => {
+const computeDeliveryFareBreakdown = ({ tariff = {}, distanceKm: tripKm = 0, parcel = null, surchargeSettings = null }) => {
   // Reported by both branches — priced and unpriced — since the quote screen
   // shows the distance even when the vehicle has no fare configured.
   const distanceKm = Math.max(0, Number(tripKm) || 0);
@@ -214,7 +216,15 @@ const computeDeliveryFareBreakdown = ({ tariff = {}, distanceKm: tripKm = 0 }) =
   const basePrice = Math.max(0, Number(tariff.basePrice || 0));
   const distancePrice = Math.max(0, Number(tariff.pricePerKm || 0));
   const extraDistanceKm = Math.max(distanceKm - baseDistance, 0);
-  const subtotal = basePrice + extraDistanceKm * distancePrice;
+  const tripSubtotal = basePrice + extraDistanceKm * distancePrice;
+  // Weight / fragile / express / insurance. Zero, and absent from the
+  // response, unless delivery.enable_parcel_surcharges is on.
+  const surcharges = computeDirectParcelSurcharges({
+    parcel: parcel || {},
+    subtotal: tripSubtotal,
+    settings: surchargeSettings || {},
+  });
+  const subtotal = tripSubtotal + surcharges.total;
   const serviceTaxAmount = (subtotal * serviceTaxPercentage) / 100;
 
   return {
@@ -224,6 +234,29 @@ const computeDeliveryFareBreakdown = ({ tariff = {}, distanceKm: tripKm = 0 }) =
     serviceTaxAmount: roundCurrency(serviceTaxAmount),
     distanceKm: roundCurrency(distanceKm),
     baseDistanceKm: roundCurrency(baseDistance),
+    ...(surcharges.enabled ? { tripSubtotal: roundCurrency(tripSubtotal), parcelSurcharges: surcharges } : {}),
+  };
+};
+
+/// The client's parcel payload with the server-owned fields fixed: the hub
+/// leg link can only be set by the hub module, and the insurance premium is
+/// whatever the surcharge computation says, never what the app sent.
+const sanitizeDirectParcel = (parcel = {}, surcharges = null) => {
+  const {
+    shipmentAwb: _awb,
+    shipmentId: _shipmentId,
+    shipmentLegId: _legId,
+    hubLegType: _legType,
+    ...rest
+  } = parcel || {};
+  const opted = Boolean(rest.insurance?.opted === true || String(rest.insurance?.opted) === 'true');
+  return {
+    ...rest,
+    insurance: {
+      opted,
+      premium: surcharges?.insurancePremium || 0,
+      coverAmount: opted ? Math.max(0, Number(rest.declaredValue) || 0) : 0,
+    },
   };
 };
 
@@ -252,6 +285,7 @@ export const createDeliveryRecord = async ({
   vehicleIconUrl,
   paymentMethod,
   parcel,
+  scheduledAt,
 }) => {
   await ensureDeliveryVehicleAllowed({ vehicleTypeId, parcel });
   const pickupCoords = normalizePoint(pickup, 'pickup');
@@ -260,11 +294,12 @@ export const createDeliveryRecord = async ({
   const vehicle = vehicleTypeId
     ? await Vehicle.findById(vehicleTypeId).select('delivery_distance_pricing service_tax').lean()
     : null;
-  const [tariff, distance] = await Promise.all([
+  const [tariff, distance, surchargeSettings] = await Promise.all([
     resolveDeliveryTariff({ vehicle, zone: pricingZone }),
     resolveDeliveryDistance(pickupCoords, dropCoords),
+    getDeliverySurchargeSettings(),
   ]);
-  const fareBreakdown = computeDeliveryFareBreakdown({ tariff, distanceKm: distance.distanceKm });
+  const fareBreakdown = computeDeliveryFareBreakdown({ tariff, distanceKm: distance.distanceKm, parcel, surchargeSettings });
 
   // The server's price is the only one a parcel books at. This used to fall
   // back to whatever `fare` the app sent whenever the server could not price
@@ -296,7 +331,10 @@ export const createDeliveryRecord = async ({
     paymentMethod,
     transport_type: 'delivery',
     serviceType: 'parcel',
-    parcel,
+    parcel: sanitizeDirectParcel(parcel, fareBreakdown.parcelSurcharges),
+    // Scheduled pickup (SOW 5.7): createRideRecord validates it and the
+    // dispatcher holds the search until then. Absent = dispatch now, as before.
+    scheduledAt: scheduledAt || undefined,
     serverPricedFareSource: 'delivery_tariff',
   });
 
@@ -309,6 +347,7 @@ export const createDeliveryRecord = async ({
         'pricingSnapshot.waiting_charge': tariff.waitingChargePerMinute,
         'pricingSnapshot.free_waiting_before': tariff.freeWaitingMinutes,
         'pricingSnapshot.delivery_tariff_source': tariff.source,
+        ...(fareBreakdown.parcelSurcharges ? { 'pricingSnapshot.fare_breakdown': fareBreakdown } : {}),
       },
     },
   );
@@ -345,11 +384,12 @@ export const getDeliveryQuote = async ({ vehicleTypeId, pickup, drop, parcel }) 
     throw new ApiError(404, 'Vehicle type not found');
   }
 
-  const [tariff, distance] = await Promise.all([
+  const [tariff, distance, surchargeSettings] = await Promise.all([
     resolveDeliveryTariff({ vehicle, zone: pricingZone }),
     resolveDeliveryDistance(pickupCoords, dropCoords),
+    getDeliverySurchargeSettings(),
   ]);
-  const fareBreakdown = computeDeliveryFareBreakdown({ tariff, distanceKm: distance.distanceKm });
+  const fareBreakdown = computeDeliveryFareBreakdown({ tariff, distanceKm: distance.distanceKm, parcel, surchargeSettings });
 
   return {
     vehicleTypeId: String(vehicleTypeId),

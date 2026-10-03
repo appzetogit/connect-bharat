@@ -915,6 +915,17 @@ const AdminLayout = () => {
           { icon: ShieldAlert, label: 'SOS', path: '/admin/safety', permission: 'dashboard.view' },
           { icon: Car, label: 'Trip Requests', path: '/admin/trips', permission: 'trips.view' },
           { icon: Package, label: 'Delivery Requests', path: '/admin/deliveries', permission: 'deliveries.view' },
+          {
+            icon: Package,
+            label: 'Parcel Network',
+            subItems: [
+              { label: 'Hubs & Staff', path: '/admin/logistics/hubs', permission: 'deliveries.view' },
+              { label: 'Rate Cards', path: '/admin/logistics/rate-cards', permission: 'deliveries.view' },
+              { label: 'Shipments', path: '/admin/logistics/shipments', permission: 'deliveries.view' },
+              { label: 'Hub Performance', path: '/admin/logistics/performance', permission: 'deliveries.view' },
+              { label: 'Network Settings', path: '/admin/logistics/settings', permission: 'deliveries.view' },
+            ],
+          },
           { icon: Clock, label: 'Ongoing Requests', path: '/admin/ongoing', permission: 'ongoing.view' },
         ],
       },

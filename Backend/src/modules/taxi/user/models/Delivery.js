@@ -171,6 +171,28 @@ const deliverySchema = new mongoose.Schema(
         url: { type: String, default: '' },
         at: { type: Date, default: null },
       },
+      /// SOW parcel fields. Priced (behind delivery.enable_parcel_surcharges)
+      /// by deliveryService; the insurance premium is always server-computed.
+      weightKg: { type: Number, default: null },
+      dimensions: {
+        l: { type: Number, default: 0 },
+        w: { type: Number, default: 0 },
+        h: { type: Number, default: 0 },
+      },
+      fragile: { type: Boolean, default: false },
+      express: { type: Boolean, default: false },
+      declaredValue: { type: Number, default: 0 },
+      insurance: {
+        opted: { type: Boolean, default: false },
+        premium: { type: Number, default: 0 },
+        coverAmount: { type: Number, default: 0 },
+      },
+      /// Set only on rides the hub network dispatches as a shipment's first or
+      /// last mile (logistics/services/legDispatchService.js).
+      shipmentAwb: { type: String, default: '' },
+      shipmentId: { type: String, default: '' },
+      shipmentLegId: { type: String, default: '' },
+      hubLegType: { type: String, default: '' },
     },
     waitingMinutes: {
       type: Number,

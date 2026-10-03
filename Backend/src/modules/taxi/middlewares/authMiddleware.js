@@ -7,6 +7,7 @@ import { Driver } from '../driver/models/Driver.js';
 import { BusDriver } from '../driver/models/BusDriver.js';
 import { PoolingVehicle } from '../admin/models/PoolingVehicle.js';
 import { User } from '../user/models/User.js';
+import { HubStaff } from '../logistics/models/HubStaff.js';
 import { verifyAccessToken } from '../services/tokenService.js';
 import {
   normalizeAdminPermissions,
@@ -23,6 +24,9 @@ const roleModelMap = {
   service_center: ServiceStore,
   service_center_staff: ServiceCenterStaff,
   user: User,
+  // Hub panel staff (managers and operators both sign in with this role);
+  // logistics/middleware/hubAuth.js adds the active-account and hub checks.
+  hub_manager: HubStaff,
 };
 
 const normalizeRole = (role = '') => {

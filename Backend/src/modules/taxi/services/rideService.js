@@ -25,6 +25,7 @@ import { resolveRideRoute } from './routeService.js';
 import { computePackageFare, quoteFareForPricingRule } from './fareEngineService.js';
 import { getTransportRideSettings } from './transportSettingsService.js';
 import { findZoneByPickup } from './matchingService.js';
+import { onParcelRideCompleted } from '../logistics/services/rideHooks.js';
 
 const clearUserActiveRideIfPresent = async (user) => {
   if (!user?.currentRideId) {
@@ -412,6 +413,28 @@ const normalizeParcelPayload = (parcel = {}) => ({
   receiverMobile: String(parcel.receiverMobile || '').trim(),
   photos: normalizeParcelPhotos(parcel.photos),
   instructions: String(parcel.instructions || parcel.specialInstructions || '').trim().slice(0, 500),
+  // SOW parcel fields (weight/size, fragile, express, insurance) and the hub
+  // network link. All optional with neutral defaults, so a payload without
+  // them stores exactly what it did before. Pricing them is deliveryService's
+  // job; the insurance premium there is always computed by the server.
+  weightKg: Number(parcel.weightKg) > 0 ? Math.round(Number(parcel.weightKg) * 1000) / 1000 : null,
+  dimensions: {
+    l: Math.max(0, Number(parcel.dimensions?.l) || 0),
+    w: Math.max(0, Number(parcel.dimensions?.w) || 0),
+    h: Math.max(0, Number(parcel.dimensions?.h) || 0),
+  },
+  fragile: parcel.fragile === true || String(parcel.fragile) === 'true',
+  express: parcel.express === true || String(parcel.express) === 'true',
+  declaredValue: Math.max(0, Number(parcel.declaredValue) || 0),
+  insurance: {
+    opted: parcel.insurance?.opted === true || String(parcel.insurance?.opted) === 'true',
+    premium: Math.max(0, Number(parcel.insurance?.premium) || 0),
+    coverAmount: Math.max(0, Number(parcel.insurance?.coverAmount) || 0),
+  },
+  shipmentAwb: String(parcel.shipmentAwb || '').trim(),
+  shipmentId: String(parcel.shipmentId || '').trim(),
+  shipmentLegId: String(parcel.shipmentLegId || '').trim(),
+  hubLegType: String(parcel.hubLegType || '').trim(),
 });
 
 const normalizeIntercityPayload = (intercity = {}) => ({
@@ -2179,6 +2202,10 @@ export const updateRideLifecycle = async ({ rideId, driverId, nextStatus, paymen
         console.warn('[invoice] not sent for ride', String(ride._id), '-', result.reason);
       }
     });
+
+    // Hub parcel network: advances the shipment when this ride was one of
+    // its first/last-mile legs. No-op for every other ride; never throws.
+    await onParcelRideCompleted(ride);
   }
 
   const populatedRide = await populateRideRealtime(ride._id);
