@@ -461,7 +461,6 @@ const DriverDetails = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [avatarFailed, setAvatarFailed] = useState(false);
-  const [documentActionKey, setDocumentActionKey] = useState('');
 
   const tabs = [
     'Driver Profile',
@@ -1223,148 +1222,10 @@ const DriverDetails = () => {
                             >
                                 View doc
                             </button>
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                if (!doc.sourceKey) return;
-                                const confirmApprove = window.confirm(`Are you sure you want to approve "${doc.name}"?`);
-                                if (!confirmApprove) return;
-
-                                try {
-                                  setDocumentActionKey(`${doc.sourceKey}:approve`);
-                                  const token = localStorage.getItem('adminToken');
-                                  const nextDocuments = {
-                                    ...(profile?.documents || {}),
-                                    [doc.sourceKey]: {
-                                      ...(profile?.documents?.[doc.sourceKey] || {}),
-                                      key: doc.sourceKey,
-                                      name: doc.name,
-                                      fileName: doc.fileNames?.[0] || doc.name || doc.sourceKey,
-                                      previewUrl: doc.images?.[0] || profile?.documents?.[doc.sourceKey]?.previewUrl || '',
-                                      secureUrl: doc.images?.[0] || profile?.documents?.[doc.sourceKey]?.secureUrl || '',
-                                      images: doc.images || profile?.documents?.[doc.sourceKey]?.images || [],
-                                      fileNames: doc.fileNames || profile?.documents?.[doc.sourceKey]?.fileNames || [],
-                                      identify_number: doc.identify_number || profile?.documents?.[doc.sourceKey]?.identify_number || '',
-                                      expiry_date: doc.expiry_date || profile?.documents?.[doc.sourceKey]?.expiry_date || '',
-                                      status: 'approved',
-                                      comment: '',
-                                      remarks: '',
-                                      reason: '',
-                                      admin_comment: '',
-                                      rejection_reason: '',
-                                      reviewedAt: new Date().toISOString(),
-                                      reverificationRequestedAt: null,
-                                    },
-                                  };
-
-                                  const response = await fetch(
-                                    `${globalThis.__LEGACY_BACKEND_ORIGIN__}/api/v1/admin/drivers/${id}`,
-                                    {
-                                      method: 'PATCH',
-                                      headers: {
-                                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                                        'Content-Type': 'application/json',
-                                      },
-                                      body: JSON.stringify({ documents: nextDocuments }),
-                                    },
-                                  );
-                                  const data = await response.json();
-                                  if (!response.ok || !data?.success) throw new Error(data?.message || 'Unable to approve');
-                                  await fetchProfile();
-                                } catch (err) {
-                                  window.alert(err?.message || 'Unable to approve');
-                                } finally {
-                                  setDocumentActionKey('');
-                                }
-                              }}
-                              disabled={
-                                documentActionKey.length > 0 ||
-                                !doc.images?.length ||
-                                String(doc.status || '').toLowerCase() === 'approved'
-                              }
-                              className={`flex-1 py-2 text-xs font-semibold rounded-md transition-colors text-center ${
-                                documentActionKey === `${doc.sourceKey}:approve`
-                                  ? 'bg-emerald-100 text-emerald-500'
-                                  : !doc.images?.length || String(doc.status || '').toLowerCase() === 'approved' || documentActionKey.length > 0
-                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                    : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
-                              }`}
-                            >
-                              Approve
-                            </button>
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                if (!doc.sourceKey) return;
-                                const note = window.prompt(`Reason for rejecting "${doc.name}"`, doc.comment || '');
-                                if (note === null) return;
-
-                                try {
-                                  setDocumentActionKey(`${doc.sourceKey}:reject`);
-                                  const token = localStorage.getItem('adminToken');
-                                  const nextDocuments = {
-                                    ...(profile?.documents || {}),
-                                    [doc.sourceKey]: {
-                                      ...(profile?.documents?.[doc.sourceKey] || {}),
-                                      key: doc.sourceKey,
-                                      name: doc.name,
-                                      fileName: doc.fileNames?.[0] || doc.name || doc.sourceKey,
-                                      previewUrl: doc.images?.[0] || profile?.documents?.[doc.sourceKey]?.previewUrl || '',
-                                      secureUrl: doc.images?.[0] || profile?.documents?.[doc.sourceKey]?.secureUrl || '',
-                                      images: doc.images || profile?.documents?.[doc.sourceKey]?.images || [],
-                                      fileNames: doc.fileNames || profile?.documents?.[doc.sourceKey]?.fileNames || [],
-                                      identify_number: doc.identify_number || profile?.documents?.[doc.sourceKey]?.identify_number || '',
-                                      expiry_date: doc.expiry_date || profile?.documents?.[doc.sourceKey]?.expiry_date || '',
-                                      status: 'rejected',
-                                      comment: String(note || '').trim(),
-                                      remarks: String(note || '').trim(),
-                                      reason: String(note || '').trim(),
-                                      admin_comment: String(note || '').trim(),
-                                      rejection_reason: String(note || '').trim(),
-                                      reviewedAt: new Date().toISOString(),
-                                      reverificationRequestedAt: null,
-                                    },
-                                  };
-
-                                  const response = await fetch(
-                                    `${globalThis.__LEGACY_BACKEND_ORIGIN__}/api/v1/admin/drivers/${id}`,
-                                    {
-                                      method: 'PATCH',
-                                      headers: {
-                                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                                        'Content-Type': 'application/json',
-                                      },
-                                      body: JSON.stringify({ documents: nextDocuments }),
-                                    },
-                                  );
-                                  const data = await response.json();
-
-                                  if (!response.ok || !data?.success) {
-                                    throw new Error(data?.message || 'Unable to reject document');
-                                  }
-
-                                  await fetchProfile();
-                                } catch (err) {
-                                  window.alert(err?.message || 'Unable to reject document');
-                                } finally {
-                                  setDocumentActionKey('');
-                                }
-                              }}
-                              disabled={
-                                documentActionKey.length > 0 ||
-                                !doc.images?.length ||
-                                ['rejected', 'declined'].includes(String(doc.status || '').toLowerCase())
-                              }
-                              className={`flex-1 py-2 text-xs font-semibold rounded-md transition-colors text-center ${
-                                documentActionKey === `${doc.sourceKey}:reject`
-                                  ? 'bg-rose-100 text-rose-500'
-                                  : !doc.images?.length || ['rejected', 'declined'].includes(String(doc.status || '').toLowerCase()) || documentActionKey.length > 0
-                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                    : 'text-rose-700 bg-rose-50 hover:bg-rose-100'
-                              }`}
-                            >
-                              Decline
-                            </button>
+                            {/* Approve and reject live in the review panel at the top of this tab,
+                                which records reviewStatus, the reviewer and the reason. These cards
+                                used to write documents[key].status directly as well, so the two
+                                disagreed. */}
                           </div>
                         </div>
                       </div>
