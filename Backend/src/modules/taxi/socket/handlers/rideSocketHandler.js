@@ -20,6 +20,7 @@ import { authorizeRideRoomAccess } from '../middleware/rideRoomAuth.js';
 import { SOCKET_EVENTS } from '../events.js';
 import { clearDriverRoute, updateDriverRoute } from '../services/driverRouteService.js';
 import { consumeScopedRateLimit } from '../../middlewares/rateLimitMiddleware.js';
+import { publishDriverLocation } from '../../admin/operations/adminFeedService.js';
 
 // Same fast-read cache key the ambient (not-on-a-ride) location handler
 // writes in socket/index.js, so a REST read of "where is this driver" works
@@ -251,6 +252,7 @@ export const registerRideSocketHandlers = ({ io, socket, onAsync }) => {
       };
 
       io.to(getRideRoom(rideId)).emit(SOCKET_EVENTS.RIDE_DRIVER_LOCATION_UPDATED, broadcastPayload);
+      publishDriverLocation(socket.auth.sub, { coordinates: normalizedCoordinates, heading: locationUpdate.heading, speed: locationUpdate.speed, rideId, isOnRide: true });
       // Fast-read cache, written every tick regardless of the persist
       // throttle above — a REST read should see the true latest fix.
       cacheDriverLocation(socket.auth.sub, {

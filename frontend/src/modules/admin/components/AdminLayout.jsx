@@ -836,6 +836,7 @@ const AdminLayout = () => {
             ],
           },
           { icon: Home, label: 'Dashboard', path: '/admin/dashboard', permission: 'dashboard.view' },
+          { icon: BarChart3, label: 'Operations Analytics', path: '/admin/dashboard/analytics', permission: 'dashboard.view' },
           { icon: IndianRupee, label: 'Admin Earnings', path: '/admin/earnings', permission: 'earnings.view' },
           { icon: MessageCircle, label: 'Chat', path: '/admin/chat', permission: 'chat.view' },
           {

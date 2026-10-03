@@ -1,7 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Filter, MoreVertical, Search, Loader2, ChevronRight, CheckCircle, MapPin, XCircle, Eye, UserPlus, FileText, User, Truck, CreditCard, X } from 'lucide-react';
 import { adminService } from '../../services/adminService';
+import { ADMIN_FEED_EVENTS } from '../../services/operationsApi';
+import { socketService } from '../../../../shared/api/socket';
+import AssignDriverModal from '../../components/operations/AssignDriverModal';
 import toast from 'react-hot-toast';
+
+const POLL_INTERVAL_MS = 30000;
+const LIFECYCLE_DEBOUNCE_MS = 1500;
+
+// The backend assigns while a ride is searching, and reassigns until the trip starts.
+const canAssignDriver = (row) => {
+  const status = String(row?.rideStatus || '').toLowerCase();
+  const live = String(row?.liveStatus || '').toLowerCase();
+  if (status === 'searching') return true;
+  return status === 'accepted' && (live === 'accepted' || live === 'arriving');
+};
 
 const STATUS_STYLES = {
   ACCEPTED: 'bg-green-100 text-green-700 border border-green-200',
@@ -99,7 +113,7 @@ const RequestDetailsModal = ({ request, onClose }) => {
   );
 };
 
-const ActionMenu = ({ row, onViewDetails, onDelete }) => {
+const ActionMenu = ({ row, onViewDetails, onDelete, onAssign }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef(null);
 
@@ -121,7 +135,8 @@ const ActionMenu = ({ row, onViewDetails, onDelete }) => {
   const isCompleted = row.tripStatus === 'COMPLETED';
   const isCancelled = row.tripStatus === 'CANCELLED';
   const isOngoing = row.tripStatus === 'ON_TRIP' || row.tripStatus === 'ONGOING';
-  const hasDriver = row.driverName && row.driverName !== '--' && row.driverName !== 'N/A';
+  const hasDriver = Boolean(row.driver);
+  const assignable = canAssignDriver(row);
 
   return (
     <div className="relative" ref={menuRef}>
@@ -140,13 +155,14 @@ const ActionMenu = ({ row, onViewDetails, onDelete }) => {
           >
             <Eye size={14} /> View Details
           </button>
-          <button 
-            disabled={isCompleted || isCancelled || isOngoing || hasDriver}
-            onClick={() => handleNotImplemented('Assign Driver')}
-            className="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-yellow-50 hover:text-yellow-900 flex items-center gap-2 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-gray-700"
-          >
-            <UserPlus size={14} /> Assign Driver
-          </button>
+          {assignable && (
+            <button 
+              onClick={(e) => { e.stopPropagation(); setIsOpen(false); onAssign(row); }}
+              className="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-yellow-50 hover:text-yellow-900 flex items-center gap-2"
+            >
+              <UserPlus size={14} /> {hasDriver ? 'Reassign Driver' : 'Assign Driver'}
+            </button>
+          )}
           <button 
             onClick={() => handleNotImplemented('Change Status')}
             className="w-full text-left px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-yellow-50 hover:text-yellow-900 flex items-center gap-2"
@@ -189,6 +205,8 @@ const Ongoing = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [assignRide, setAssignRide] = useState(null);
+  const [liveConnected, setLiveConnected] = useState(() => socketService.isConnected());
 
   const [draftFilters, setDraftFilters] = useState({
     status: '',
@@ -208,9 +226,9 @@ const Ongoing = () => {
     dateTo: ''
   });
 
-  const loadRows = React.useCallback(async () => {
+  const loadRows = React.useCallback(async ({ silent = false } = {}) => {
     let active = true;
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError('');
     try {
       const response = await adminService.getOngoingRides({
@@ -223,7 +241,7 @@ const Ongoing = () => {
       if (!active) return;
       setRows(data?.results || []);
     } catch (err) {
-      if (active) {
+      if (active && !silent) {
         setError(err?.message || 'Failed to load ongoing rides');
         setRows([]);
       }
@@ -237,6 +255,48 @@ const Ongoing = () => {
     const cleanup = loadRows();
     return () => { if(typeof cleanup === 'function') cleanup(); };
   }, [loadRows]);
+
+  // Background refreshes (socket + polling) always use the latest filters.
+  const loadRowsRef = useRef(loadRows);
+  useEffect(() => { loadRowsRef.current = loadRows; }, [loadRows]);
+
+  // Real-time: any ride lifecycle event triggers one debounced silent refetch.
+  useEffect(() => {
+    socketService.connect({ role: 'admin' });
+    let timer = null;
+    const onLifecycle = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        loadRowsRef.current({ silent: true });
+      }, LIFECYCLE_DEBOUNCE_MS);
+    };
+    const onConnect = () => setLiveConnected(true);
+    const onDisconnect = () => setLiveConnected(false);
+
+    socketService.on(ADMIN_FEED_EVENTS.RIDE_LIFECYCLE, onLifecycle);
+    socketService.on('connect', onConnect);
+    socketService.on('disconnect', onDisconnect);
+    setLiveConnected(socketService.isConnected());
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      socketService.off(ADMIN_FEED_EVENTS.RIDE_LIFECYCLE, onLifecycle);
+      socketService.off('connect', onConnect);
+      socketService.off('disconnect', onDisconnect);
+    };
+  }, []);
+
+  // Polling fallback in case socket events are missed.
+  useEffect(() => {
+    const interval = setInterval(() => loadRowsRef.current({ silent: true }), POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleAssigned = () => {
+    setAssignRide(null);
+    loadRows({ silent: true });
+  };
 
   const handleDelete = async (request) => {
     const confirmed = window.confirm(`Delete request ${request.requestId}? This will remove it for both rider and driver.`);
@@ -274,6 +334,13 @@ const Ongoing = () => {
             <h1 className="text-lg font-bold tracking-tight text-gray-900">Ongoing Requests</h1>
             <p className="text-xs text-gray-500 mt-0.5 font-medium">Manage and track active rides and deliveries.</p>
           </div>
+          <span
+            title={liveConnected ? 'Receiving live ride updates' : 'Live updates unavailable, refreshing every 30s'}
+            className={`ml-auto mr-3 inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-bold rounded-full border ${liveConnected ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${liveConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+            {liveConnected ? 'Live' : 'Polling'}
+          </span>
           <div className="hidden md:flex items-center gap-2 text-xs font-medium text-gray-400">
             <span>Operations</span>
             <ChevronRight size={14} className="text-gray-300" />
@@ -446,7 +513,7 @@ const Ongoing = () => {
                       <div className="bg-red-50 text-red-500 p-4 rounded-lg inline-block border border-red-100">
                         <XCircle size={24} className="mx-auto mb-2" />
                         <p className="text-sm font-bold">{error}</p>
-                        <button onClick={loadRows} className="mt-3 px-4 py-1.5 bg-red-100 text-red-700 rounded text-xs font-bold hover:bg-red-200">
+                        <button onClick={() => loadRows()} className="mt-3 px-4 py-1.5 bg-red-100 text-red-700 rounded text-xs font-bold hover:bg-red-200">
                           Retry
                         </button>
                       </div>
@@ -485,6 +552,7 @@ const Ongoing = () => {
                           row={row} 
                           onViewDetails={() => setSelectedRequest(row)} 
                           onDelete={handleDelete}
+                          onAssign={setAssignRide}
                         />
                       </td>
                     </tr>
@@ -500,6 +568,14 @@ const Ongoing = () => {
         request={selectedRequest} 
         onClose={() => setSelectedRequest(null)} 
       />
+
+      {assignRide && (
+        <AssignDriverModal
+          ride={assignRide}
+          onClose={() => setAssignRide(null)}
+          onAssigned={handleAssigned}
+        />
+      )}
     </div>
   );
 };

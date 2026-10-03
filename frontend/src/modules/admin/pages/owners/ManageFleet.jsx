@@ -18,6 +18,9 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import AdminPageHeader from '../../components/ui/AdminPageHeader';
+import { operationsApi, unwrap } from '../../services/operationsApi';
+import ReasonDialog from '../../components/approvals/ReasonDialog';
+import { getApiErrorMessage } from '../../components/approvals/approvalUtils';
 
 const BASE = globalThis.__LEGACY_BACKEND_ORIGIN__ + '/api/v1/admin';
 const MotionDiv = motion.div;
@@ -102,6 +105,7 @@ const ManageFleet = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [updatingFleetId, setUpdatingFleetId] = useState('');
+  const [rejectingFleet, setRejectingFleet] = useState(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
@@ -276,51 +280,38 @@ const ManageFleet = () => {
     }
   };
 
-  const handleStatusUpdate = async (item, nextStatus) => {
+  const handleStatusUpdate = async (item, nextStatus, reason = '') => {
     const fleetId = item?._id;
     if (!fleetId) return;
 
-    let reason = '';
-    if (nextStatus === 'rejected') {
-      reason = window.prompt('Add a rejection reason for this fleet vehicle:', getFleetStatusReason(item))?.trim() || '';
-      if (!reason) {
-        window.alert('A rejection reason is required.');
-        return;
-      }
+    if (nextStatus === 'rejected' && !reason) {
+      setRejectingFleet(item);
+      return;
     }
 
     setUpdatingFleetId(fleetId);
     try {
-      const res = await fetch(`${BASE}/owner-management/manage-fleet/${fleetId}`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({
-          status: nextStatus,
-          reason: nextStatus === 'rejected' ? reason : '',
-        })
-      });
-      const json = await res.json();
-
-      if (!json.success) {
-        window.alert(json.message || 'Status update failed');
-        return;
-      }
+      const response = nextStatus === 'rejected'
+        ? await operationsApi.rejectFleetVehicle(fleetId, reason)
+        : await operationsApi.approveFleetVehicle(fleetId);
+      const data = unwrap(response) || {};
 
       setFleet((current) =>
         current.map((fleetItem) =>
           fleetItem._id === fleetId
             ? {
                 ...fleetItem,
-                ...(json.data || {}),
-                status: json.data?.status || nextStatus,
-                reason: getFleetStatusReason(json.data) || (nextStatus === 'rejected' ? reason : ''),
+                status: data.status || nextStatus,
+                reason: nextStatus === 'rejected' ? (getFleetStatusReason(data) || reason) : '',
+                reviewedAt: data.reviewedAt || fleetItem.reviewedAt,
               }
             : fleetItem
         )
       );
+      setRejectingFleet(null);
     } catch (error) {
       console.error('Failed to update fleet status:', error);
-      window.alert('Status update failed');
+      window.alert(getApiErrorMessage(error, 'Status update failed'));
     } finally {
       setUpdatingFleetId('');
     }
@@ -869,6 +860,18 @@ const ManageFleet = () => {
         </div>
         </MotionDiv>
       </AnimatePresence>
+
+      <ReasonDialog
+        open={Boolean(rejectingFleet)}
+        title={`Reject ${rejectingFleet?.license_plate_number || 'fleet vehicle'}`}
+        description="Drivers assigned to this vehicle are notified with this reason."
+        placeholder="e.g. Insurance expired"
+        confirmLabel="Reject vehicle"
+        initialValue={rejectingFleet ? getFleetStatusReason(rejectingFleet) : ''}
+        busy={Boolean(rejectingFleet) && updatingFleetId === rejectingFleet?._id}
+        onClose={() => setRejectingFleet(null)}
+        onConfirm={(reason) => handleStatusUpdate(rejectingFleet, 'rejected', reason)}
+      />
     </div>
   );
 };

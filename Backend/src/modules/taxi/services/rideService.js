@@ -29,6 +29,7 @@ import { applyRideWaitingCharge, recordWaitingChargeInBreakdown } from './rideWa
 import { applyOutstationFinalFare, assertOutstationOdometer, buildOutstationBookingFields, quoteOutstationFare, serializeOutstationRealtime } from '../outstation/services/outstationHooks.js';
 import { buildDateRangeCondition } from './dateRangeFilter.js';
 import { enforceTripOtp, notifyParcelReceiverOtp } from './tripOtpService.js';
+import { publishRideLifecycle } from '../admin/operations/adminFeedService.js';
 
 const clearUserActiveRideIfPresent = async (user) => {
   if (!user?.currentRideId) {
@@ -1495,6 +1496,7 @@ export const createRideRecord = async ({
     user.currentRideId = ride._id;
     await user.save();
     await syncDeliveryWithRide(ride);
+    publishRideLifecycle('created', ride);
 
     return ride;
   }
@@ -1569,6 +1571,7 @@ export const createRideRecord = async ({
 
       await session.commitTransaction();
       await syncDeliveryWithRide(rideDoc);
+      publishRideLifecycle('created', rideDoc);
       return rideDoc;
     } catch (error) {
       lastError = error;
@@ -1751,8 +1754,10 @@ export const ensureRideParticipantAccess = async ({ rideId, role, entityId }) =>
   const actorId = String(entityId);
   const isUser = role === 'user' && String(ride.userId) === actorId;
   const isDriver = role === 'driver' && ride.driverId && String(ride.driverId) === actorId;
+  // Admins watch any ride live (read-only: appendRideMessage still refuses them).
+  const isAdmin = role === 'admin' || role === 'super-admin';
 
-  if (!isUser && !isDriver) {
+  if (!isUser && !isDriver && !isAdmin) {
     throw new ApiError(403, 'You are not allowed to access this ride room');
   }
 
@@ -2227,6 +2232,7 @@ export const updateRideLifecycle = async ({ rideId, driverId, nextStatus, paymen
 
   const populatedRide = await populateRideRealtime(ride._id);
   populatedRide.$locals.walletUpdate = walletUpdate;
+  publishRideLifecycle('status', populatedRide);
 
   return populatedRide;
 };

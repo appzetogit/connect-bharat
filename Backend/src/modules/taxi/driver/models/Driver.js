@@ -243,6 +243,43 @@ const driverSchema = new mongoose.Schema(
       default: 'approved',
       trim: true,
     },
+    /// Why an admin turned the whole application down, shown to the driver so
+    /// they know what to fix. Per-document reasons live on each entry in
+    /// `documents` (reviewStatus / reviewReason) - this is the overall verdict.
+    rejectionReason: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    rejectedAt: {
+      type: Date,
+      default: null,
+    },
+    /// Approval of the driver's own vehicle (the inline vehicle* fields above).
+    /// Company vehicles are approved on FleetVehicle instead. Only consulted
+    /// by dispatch when customization.require_vehicle_approval is '1', so the
+    /// 'pending' default changes nothing until an admin switches that on.
+    vehicleApproval: {
+      status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+        default: 'pending',
+      },
+      reason: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      reviewedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Admin',
+        default: null,
+      },
+      reviewedAt: {
+        type: Date,
+        default: null,
+      },
+    },
     rating: {
       type: Number,
       default: 0,

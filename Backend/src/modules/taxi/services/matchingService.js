@@ -7,6 +7,7 @@ import { Zone } from '../driver/models/Zone.js';
 import { DriverSubscription } from '../driver/models/DriverSubscription.js';
 import { resolveDriverSubscriptionSettings } from '../driver/services/driverSubscriptionService.js';
 import { getDriverIdsBlockedByUpcomingScheduledRides } from './rideService.js';
+import { buildVehicleApprovalDispatchFilter } from '../admin/operations/vehicleApprovalService.js';
 
 const EARTH_RADIUS_METERS = 6371000;
 
@@ -376,6 +377,8 @@ const findDriversForZone = async ({
     // work. Off entirely unless an admin has switched it on, and the id list
     // is small: it is one day's paying drivers.
     ...(await buildSubscriptionDriverFilter()),
+    // Only drivers with an approved vehicle, when require_vehicle_approval is on.
+    ...(await buildVehicleApprovalDispatchFilter()),
   };
   const selectedFields =
     'name phone socketId vehicleTypeId vehicleTypeIds vehicleType vehicleIconType vehicleNumber vehicleColor vehicleMake vehicleModel rating location zoneId service_location_id isOnline isOnRide routeBooking';

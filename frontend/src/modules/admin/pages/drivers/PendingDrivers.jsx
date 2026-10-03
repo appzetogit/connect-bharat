@@ -14,11 +14,17 @@ import {
   Star,
   Trash2,
   XCircle,
+  ShieldCheck,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { adminService } from '../../services/adminService';
+import { operationsApi } from '../../services/operationsApi';
+import DriverReviewModal from '../../components/approvals/DriverReviewModal';
+import ReasonDialog from '../../components/approvals/ReasonDialog';
+import { ApprovalBlockers } from '../../components/approvals/DriverApplicationDecision';
+import { getApiErrorDetails, getApiErrorMessage, getApiErrorStatus } from '../../components/approvals/approvalUtils';
 
 const ACTION_MENU_WIDTH = 220;
 const ACTION_MENU_GAP = 8;
@@ -38,6 +44,10 @@ const PendingDrivers = () => {
   const [page, setPage] = useState(1);
   const [paginator, setPaginator] = useState(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [reviewDriverId, setReviewDriverId] = useState(null);
+  const [rejectTarget, setRejectTarget] = useState(null); // { id, name }
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [approvalBlockers, setApprovalBlockers] = useState(null); // { name, details }
 
   const openActionMenu = (driverId, anchorEl) => {
     const rect = anchorEl.getBoundingClientRect();
@@ -94,7 +104,8 @@ const PendingDrivers = () => {
       }
 
       if (action === 'approve') {
-        await adminService.updateDriverStatus(driverId, { approve: true, status: 'approved' });
+        setApprovalBlockers(null);
+        await operationsApi.approveDriver(driverId);
       } else if (action === 'delete') {
         await adminService.deleteDriver(driverId);
       } else if (action === 'password') {
@@ -111,10 +122,30 @@ const PendingDrivers = () => {
         }
       }
     } catch (err) {
-      alert(err?.message || `Network error during ${action}`);
+      const details = getApiErrorDetails(err);
+      if (action === 'approve' && getApiErrorStatus(err) === 409 && details) {
+        setApprovalBlockers({ name: pendingDrivers.find((d) => d.id === driverId)?.name || 'This driver', details });
+        return;
+      }
+      alert(getApiErrorMessage(err, `Network error during ${action}`));
       if (action === 'password') setPasswordModal(prev => ({ ...prev, isSubmitting: false }));
     } finally {
       closeMenu();
+    }
+  };
+
+  const handleRejectApplication = async (reason) => {
+    if (!rejectTarget?.id) return;
+    setIsRejecting(true);
+    try {
+      await operationsApi.rejectDriver(rejectTarget.id, reason);
+      setRejectTarget(null);
+      alert('Application rejected');
+      await fetchPendingDrivers();
+    } catch (err) {
+      alert(getApiErrorMessage(err, 'Failed to reject application'));
+    } finally {
+      setIsRejecting(false);
     }
   };
 
@@ -139,7 +170,7 @@ const PendingDrivers = () => {
           transport: d.transport_type || d.register_for || d.transport_type || 'N/A',
           docs: 'View Docs',
           status: (String(d.status || '').toUpperCase() || 'PENDING'),
-          reason: d.rejectionReason || d.rejected_reason || '-',
+          reason: d.rejectionReason || d.rejected_reason || '',
           rating: d.rating || 0.0,
           registeredAt: d.createdAt || null,
         }));
@@ -216,6 +247,13 @@ const PendingDrivers = () => {
       {error && (
         <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">
           {error}
+        </div>
+      )}
+
+      {approvalBlockers && (
+        <div className="mb-3">
+          <p className="mb-1 text-xs font-semibold text-gray-700">{approvalBlockers.name} was not approved.</p>
+          <ApprovalBlockers details={approvalBlockers.details} onDismiss={() => setApprovalBlockers(null)} />
         </div>
       )}
       
@@ -342,9 +380,9 @@ const PendingDrivers = () => {
                     <td className="px-3 py-1.5 text-gray-600">{driver.transport}</td>
                     <td className="px-3 py-1.5 text-center">
                       <button
-                        onClick={() => navigate(`/admin/drivers/${driver.id}?tab=Documents`, { state: { from: '/admin/drivers/pending' } })}
+                        onClick={() => setReviewDriverId(driver.id)}
                         className="inline-flex items-center justify-center w-6 h-6 rounded border border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-black transition-colors"
-                        title="View Documents"
+                        title="Review Documents"
                       >
                         <FileText size={12} />
                       </button>
@@ -353,6 +391,11 @@ const PendingDrivers = () => {
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-yellow-100 text-yellow-800 uppercase border border-yellow-200">
                         {driver.status || 'PENDING'}
                       </span>
+                      {driver.reason && (
+                        <p className="mt-0.5 max-w-[180px] mx-auto truncate text-[10px] text-rose-600" title={driver.reason}>
+                          {driver.reason}
+                        </p>
+                      )}
                     </td>
                     <td className="px-3 py-1.5 text-[10px] text-gray-500">{formatDate(driver.registeredAt)}</td>
                     <td className="px-3 py-1.5 text-right">
@@ -452,8 +495,28 @@ const PendingDrivers = () => {
               ...menuPosition,
             }}
           >
+            <button
+              onClick={() => {
+                const driverId = activeMenu;
+                closeMenu();
+                setReviewDriverId(driverId);
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors text-sm font-medium"
+            >
+              <ShieldCheck size={15} className="text-indigo-600" /> Review Application
+            </button>
             <button onClick={() => handleAction('approve', activeMenu)} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors text-sm font-medium">
               <CheckCircle2 size={15} className="text-green-600" /> Approve Driver
+            </button>
+            <button
+              onClick={() => {
+                const target = pendingDrivers.find((d) => d.id === activeMenu);
+                closeMenu();
+                setRejectTarget({ id: activeMenu, name: target?.name || 'driver' });
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors text-sm font-medium"
+            >
+              <XCircle size={15} className="text-rose-600" /> Reject Application
             </button>
             <button onClick={() => handleAction('edit', activeMenu)} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors text-sm font-medium">
               <Edit2 size={15} className="text-yellow-600" /> Edit Details
@@ -478,6 +541,24 @@ const PendingDrivers = () => {
         </>,
         document.body,
       )}
+
+      <DriverReviewModal
+        open={Boolean(reviewDriverId)}
+        driverId={reviewDriverId}
+        onClose={() => setReviewDriverId(null)}
+        onDecision={() => fetchPendingDrivers()}
+      />
+
+      <ReasonDialog
+        open={Boolean(rejectTarget)}
+        title={`Reject ${rejectTarget?.name || 'driver'}'s application`}
+        description="The driver is notified with this reason."
+        placeholder="e.g. Licence expired"
+        confirmLabel="Reject application"
+        busy={isRejecting}
+        onClose={() => setRejectTarget(null)}
+        onConfirm={handleRejectApplication}
+      />
 
     </div>
   );

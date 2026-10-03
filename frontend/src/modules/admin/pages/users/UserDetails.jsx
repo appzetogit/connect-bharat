@@ -21,9 +21,15 @@ import {
   ArrowDownRight,
   History as HistoryIcon,
   Search,
-  Ticket
+  Ticket,
+  BadgeCheck,
+  Ban
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import { operationsApi, unwrap } from '../../services/operationsApi';
+import ReasonDialog from '../../components/approvals/ReasonDialog';
+import { getApiErrorMessage } from '../../components/approvals/approvalUtils';
 
 const UserDetails = () => {
   const { id } = useParams();
@@ -41,6 +47,8 @@ const UserDetails = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [moderationDialog, setModerationDialog] = useState(null); // 'block' | 'verify' | null
+  const [isModerating, setIsModerating] = useState(false);
   
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const filterRef = useRef(null);
@@ -93,6 +101,9 @@ const UserDetails = () => {
               balance: u.wallet_balance || u.user_id?.wallet_balance || 0
             },
             subscriptionSummary: u.subscriptionSummary || { activeCount: 0, activePlans: [] },
+            active: u.active !== undefined ? Boolean(u.active) : u.user_id?.active !== undefined ? Boolean(u.user_id.active) : true,
+            isVerified: Boolean(u.isVerified ?? u.user_id?.isVerified),
+            blockReason: u.blockReason || u.user_id?.blockReason || '',
           });
         }
 
@@ -229,6 +240,43 @@ const UserDetails = () => {
     }
   };
 
+  const applyModeration = (data, fallback) => {
+    setUser((prev) => (prev ? {
+      ...prev,
+      active: data?.active ?? fallback.active ?? prev.active,
+      isVerified: data?.isVerified ?? fallback.isVerified ?? prev.isVerified,
+      blockReason: data?.blockReason ?? fallback.blockReason ?? prev.blockReason,
+    } : prev));
+  };
+
+  const handleSetBlocked = async (blocked, reason = '') => {
+    setIsModerating(true);
+    try {
+      const res = await operationsApi.setUserBlocked(id, blocked, reason);
+      applyModeration(unwrap(res), { active: !blocked, blockReason: blocked ? reason : '' });
+      toast.success(blocked ? 'User blocked' : 'User unblocked');
+      setModerationDialog(null);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Failed to update status'));
+    } finally {
+      setIsModerating(false);
+    }
+  };
+
+  const handleSetVerified = async (verified, note = '') => {
+    setIsModerating(true);
+    try {
+      const res = await operationsApi.setUserVerified(id, verified, note);
+      applyModeration(unwrap(res), { isVerified: verified });
+      toast.success(verified ? 'User verified' : 'User unverified');
+      setModerationDialog(null);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'Failed to update verification'));
+    } finally {
+      setIsModerating(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[600px] gap-4">
@@ -283,7 +331,20 @@ const UserDetails = () => {
               )}
             </div>
             <div className="text-center md:text-left space-y-1 mt-1">
-              <h2 className="text-lg font-bold text-gray-900 tracking-tight leading-tight">{user.name}</h2>
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
+                <h2 className="text-lg font-bold text-gray-900 tracking-tight leading-tight">{user.name}</h2>
+                {user.isVerified && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 border border-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700">
+                    <BadgeCheck size={12} /> Verified
+                  </span>
+                )}
+                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${user.active ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700'}`}>
+                  {user.active ? 'Active' : 'Blocked'}
+                </span>
+              </div>
+              {!user.active && user.blockReason && (
+                <p className="text-xs font-medium text-rose-600">Blocked: {user.blockReason}</p>
+              )}
               <div className="flex flex-col md:flex-row md:items-center gap-1.5 md:gap-4 text-sm font-medium text-gray-500">
                 <div className="flex items-center justify-center md:justify-start gap-1.5">
                   <Phone size={14} className="text-gray-400" /> {user.phone}
@@ -301,6 +362,36 @@ const UserDetails = () => {
           </div>
 
           <div className="flex flex-wrap items-center justify-center md:justify-end gap-2 shrink-0">
+            <button
+              type="button"
+              disabled={isModerating}
+              onClick={() => {
+                if (user.isVerified) {
+                  if (window.confirm(`Remove the verified badge from ${user.name}?`)) handleSetVerified(false);
+                } else {
+                  setModerationDialog('verify');
+                }
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              <BadgeCheck size={13} className={user.isVerified ? 'text-gray-400' : 'text-sky-600'} />
+              {user.isVerified ? 'Unverify' : 'Verify'}
+            </button>
+            <button
+              type="button"
+              disabled={isModerating}
+              onClick={() => {
+                if (user.active) {
+                  setModerationDialog('block');
+                } else if (window.confirm(`Unblock ${user.name}? They will be able to use their account again.`)) {
+                  handleSetBlocked(false);
+                }
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${user.active ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
+            >
+              <Ban size={13} />
+              {user.active ? 'Block' : 'Unblock'}
+            </button>
             {user.profileImage ? (
               <a
                 href={user.profileImage}
@@ -719,6 +810,28 @@ const UserDetails = () => {
         </div>
       )}
 
+      <ReasonDialog
+        open={moderationDialog === 'block'}
+        title={`Block ${user.name}`}
+        description="They will not be able to log in or use their account until unblocked."
+        placeholder="e.g. Repeated no-shows"
+        confirmLabel="Block user"
+        busy={isModerating}
+        onClose={() => setModerationDialog(null)}
+        onConfirm={(reason) => handleSetBlocked(true, reason)}
+      />
+      <ReasonDialog
+        open={moderationDialog === 'verify'}
+        title={`Verify ${user.name}`}
+        label="Note"
+        placeholder="e.g. Checked Aadhaar in person"
+        confirmLabel="Mark verified"
+        tone="primary"
+        required={false}
+        busy={isModerating}
+        onClose={() => setModerationDialog(null)}
+        onConfirm={(note) => handleSetVerified(true, note)}
+      />
     </div>
   );
 };
