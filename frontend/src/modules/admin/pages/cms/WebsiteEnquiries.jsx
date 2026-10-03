@@ -148,6 +148,14 @@ export default function WebsiteEnquiries() {
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDate(row.createdAt)}</td>
                     <td className="px-4 py-3">
                       <span className="text-xs font-semibold uppercase tracking-wide text-gray-700">{row.type}</span>
+                      {row.type === 'corporate' && (
+                        <a
+                          href={`/admin/corporates/create?enquiryId=${encodeURIComponent(row._id)}`}
+                          className="block text-xs font-semibold text-emerald-700 mt-1 hover:underline"
+                        >
+                          Convert to corporate
+                        </a>
+                      )}
                     </td>
                     <td className="px-4 py-3 font-medium text-gray-900">{row.name}</td>
                     <td className="px-4 py-3">

@@ -23,6 +23,7 @@ export const ADMIN_PERMISSION_GROUPS = [
       { key: 'support.view', label: 'Support' },
       { key: 'reports.view', label: 'Reports' },
       { key: 'referrals.view', label: 'Referrals' },
+      { key: 'corporates.view', label: 'Corporate Accounts' },
     ],
   },
   {

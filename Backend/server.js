@@ -9,6 +9,7 @@ import { restoreScheduledDispatches, startDispatchRecoveryLoop } from './src/mod
 import { startDriverSubscriptionExpiryLoop } from './src/modules/taxi/driver/services/driverSubscriptionExpiryService.js';
 import { startOutstationAdvanceLoop } from './src/modules/taxi/outstation/services/outstationService.js';
 import { startPaymentEventSweeper } from './src/modules/taxi/payments/services/webhookService.js';
+import { startCorporateJobsLoop } from './src/modules/taxi/corporate/services/corporateJobs.js';
 
 const bootstrap = async () => {
   await connectDatabase();
@@ -30,6 +31,7 @@ const bootstrap = async () => {
   startDriverSubscriptionExpiryLoop();
   startOutstationAdvanceLoop();
   startPaymentEventSweeper();
+  startCorporateJobsLoop();
 
   // Loopback by default: nginx is the only thing that should reach these
   // processes, and with several instances on 5000-5003 a public bind would let

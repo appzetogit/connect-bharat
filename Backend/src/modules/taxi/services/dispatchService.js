@@ -21,6 +21,7 @@ import { SOCKET_EVENTS } from '../socket/events.js';
 import { resolveTransportDispatchConfig } from './transportSettingsService.js';
 import { sendPushNotificationToEntities } from './pushNotificationService.js';
 import { lifecycleEventForAcceptedRide, publishRideCancelled, publishRideLifecycle } from '../admin/operations/adminFeedService.js';
+import { isRideAwaitingCorporateApproval } from '../corporate/services/corporateDispatchGate.js';
 
 const activeDispatches = new Map();
 let ioInstance = null;
@@ -1451,6 +1452,8 @@ export const startDispatchFlow = async (ride, { forceRestart = false } = {}) => 
 
   // An outstation ride whose advance is unpaid waits; paying it starts dispatch.
   if (await isRideAwaitingAdvance(ride)) return;
+  // Held until a corporate approver says yes; approval calls this again.
+  if (await isRideAwaitingCorporateApproval(ride)) return;
 
   stopDispatchFlow(ride._id, { releaseLease: false });
 

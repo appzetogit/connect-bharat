@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import { RIDE_LIVE_STATUS, RIDE_STATUS } from '../../constants/index.js';
 import { outstationIntercityFields, outstationRideFields } from '../../outstation/models/outstationRideFields.js';
+import { rideCorporateSchema } from '../../corporate/models/rideCorporateSchema.js';
 
 const rideMessageSchema = new mongoose.Schema(
   {
@@ -416,10 +417,17 @@ const rideSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ['cash', 'online'],
+      // 'corporate' = billed to the rider's company credit account; never
+      // collected by the driver (see corporate/services/corporateBookingService.js).
+      enum: ['cash', 'online', 'corporate'],
       default: 'cash',
       lowercase: true,
       trim: true,
+    },
+    /// Only on company-billed rides. See corporate/models/rideCorporateSchema.js.
+    corporate: {
+      type: rideCorporateSchema,
+      default: undefined,
     },
     otp: {
       type: String,
@@ -812,6 +820,10 @@ rideSchema.index({ userId: 1, createdAt: -1 });
 rideSchema.index({ driverId: 1, createdAt: -1 });
 rideSchema.index({ status: 1, liveStatus: 1, scheduledAt: 1, createdAt: -1 });
 rideSchema.index({ driverId: 1, scheduledAt: 1, status: 1, liveStatus: 1 });
+rideSchema.index(
+  { 'corporate.corporateId': 1, status: 1, completedAt: -1 },
+  { partialFilterExpression: { 'corporate.corporateId': { $exists: true } } },
+);
 
 /// Every parcel gets its receiver OTP at booking, whichever path creates it.
 rideSchema.pre('validate', function assignParcelDropOtp() {

@@ -31,6 +31,7 @@ export const ADMIN_PERMISSIONS = [
   'settings.view',
   'landing_content.view',
   'enquiries.view',
+  'corporates.view',
 ];
 
 /// Write counterparts of the `.view` keys, enforced per HTTP method by
