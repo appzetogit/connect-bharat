@@ -5,6 +5,7 @@ import { DriverSubscription } from '../models/DriverSubscription.js';
 import { SubscriptionPlan } from '../../admin/models/SubscriptionPlan.js';
 import { Vehicle } from '../../admin/models/Vehicle.js';
 import { getDriverSubscriptionSettings } from '../../services/transportSettingsService.js';
+import { withOptionalTransaction } from '../../../../utils/transaction.js';
 // Imported lazily inside purchaseDriverSubscription (not at module load) to
 // avoid a circular import: walletService.js itself imports
 // getActiveDriverSubscription/resolveDriverSubscriptionSettings from this file.
@@ -278,7 +279,7 @@ export const purchaseDriverSubscription = async ({ driverId, planId, paymentMeth
   try {
     let created = null;
 
-    await session.withTransaction(async () => {
+    await withOptionalTransaction(session, async () => {
       const currentBalance = Number(
         (await Driver.findById(driver._id).select('wallet.balance').session(session))?.wallet?.balance || 0,
       );
@@ -358,7 +359,7 @@ export const purchaseDriverSubscriptionFromJoiningBonus = async ({ driverId, bon
   try {
     let created = null;
 
-    await session.withTransaction(async () => {
+    await withOptionalTransaction(session, async () => {
       const currentBalance = Number(
         (await Driver.findById(driver._id).select('wallet.balance').session(session))?.wallet?.balance || 0,
       );
