@@ -36,3 +36,12 @@ export const abortTransaction = async (session) => {
     await session.abortTransaction();
   }
 };
+
+/// `session.withTransaction(fn)` where transactions exist; on a standalone
+/// server, just `fn()` with the same session (no transaction to retry).
+export const withOptionalTransaction = async (session, fn) => {
+  if (session && transactionsSupported()) {
+    return session.withTransaction(fn);
+  }
+  return fn();
+};
